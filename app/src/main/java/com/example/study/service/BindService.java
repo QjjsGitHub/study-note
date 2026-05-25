@@ -1,7 +1,6 @@
 package com.example.study.service;
 
 import android.annotation.SuppressLint;
-import android.app.ActivityManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -24,9 +23,6 @@ import androidx.core.graphics.drawable.IconCompat;
 import com.example.study.MainActivity;
 import com.example.study.R;
 
-import java.lang.reflect.Field;
-import java.util.List;
-
 public class BindService extends Service {
 
     private final MyBinder mBinder = new MyBinder(this);
@@ -42,9 +38,7 @@ public class BindService extends Service {
         Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :onCreate ");
         super.onCreate();
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            setForegroundService();
-        }
+        setForegroundService();
 
         quit = true;
 
@@ -55,6 +49,7 @@ public class BindService extends Service {
                     try {
                         Thread.sleep(5000);
                     } catch (InterruptedException e) {
+                        Log.d("BindService error", e.toString());
                     }
                     count++;
 
@@ -67,7 +62,7 @@ public class BindService extends Service {
 
     }
 
-    public void getTopActivityPackageName(Context context) {
+    /*public void getTopActivityPackageName(Context context) {
         final int PROCESS_STATE_TOP = 2;
         try {
             Field processStateField = ActivityManager.RunningAppProcessInfo.class.getDeclaredField("processState");
@@ -86,7 +81,7 @@ public class BindService extends Service {
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
+    }*/
 
     @Nullable
     @Override
@@ -126,7 +121,6 @@ public class BindService extends Service {
     }
 
     @SuppressLint("ForegroundServiceType")
-    @RequiresApi(api = Build.VERSION_CODES.O)
     void setForegroundService() {
 
         String channelId = "channelId";

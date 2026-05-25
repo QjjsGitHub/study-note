@@ -55,13 +55,13 @@ class FirstFragment : Fragment() {
         fun getUsers(): Observable<List<User>>
     }
 
-    val retrofit = Retrofit.Builder()
+    val retrofit: Retrofit = Retrofit.Builder()
         .baseUrl("https://www.baidu.com/")  // 替换为实际的baseUrl
         .addConverterFactory(GsonConverterFactory.create())
         .addCallAdapterFactory(RxJava2CallAdapterFactory.create()) // 适配器，将返回类型转换为Observable
         .build()
 
-    val apiService = retrofit.create(ApiService::class.java)
+    val apiService: ApiService = retrofit.create(ApiService::class.java)
 
 
     override fun onCreateView(

@@ -566,7 +566,6 @@ class NormalActivity : AppCompatActivity() {
         )
     }
 
-    @Preview
     @Composable
     fun MyImage(size: Int) {
         Image(

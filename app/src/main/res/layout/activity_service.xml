@@ -51,7 +51,7 @@
         android:id="@+id/button17"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="32dp"
         android:text="binderFun"
         app:layout_constraintEnd_toEndOf="@+id/button16"
         app:layout_constraintTop_toBottomOf="@+id/button16" />
@@ -60,10 +60,11 @@
         android:id="@+id/button18"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginStart="24dp"
+        android:layout_marginTop="32dp"
         android:text="aidlService"
-        app:layout_constraintTop_toBottomOf="@+id/button14"
-        tools:layout_editor_absoluteX="24dp" />
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/button14" />
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>

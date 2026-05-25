@@ -12,7 +12,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,7 +20,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.visible
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -32,7 +30,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxDefaults
@@ -40,7 +37,6 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.VerticalDivider
-import androidx.compose.material3.contentColorFor
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
@@ -59,7 +55,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
@@ -74,9 +69,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.example.study.R
 import com.example.study.compose.ui.theme.StudyTheme
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
-import kotlin.coroutines.CoroutineContext
 
 const val TAG = "ComposeActivityLOG"
 
@@ -231,6 +224,10 @@ fun MainUi(name: String, modifier: Modifier = Modifier) {
 
 data class User(val name: String = "小明", var age: Int = 18, var image: Int = 1) {
 
+    fun getInfo(): String {
+        return "我是 " + age + "岁的" + name + " 头像是:" + image
+    }
+
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -373,10 +370,11 @@ fun ListView(users: SnapshotStateList<User>, modifier: Modifier) {
                             .fillMaxWidth()
                             .clickable(onClick = {
 
-                                val (name, age, image1) = user
+                                //val (name, age, image1) = user
+
                                 Toast.makeText(
                                     context,
-                                    "我是 " + age + "的" + name + ":" + image1,
+                                    user.getInfo(),
                                     Toast.LENGTH_SHORT
                                 ).show()
 
@@ -425,8 +423,10 @@ fun MyTextField() {
     TextField(
         value = text,//text 与TextField进行绑定
         onValueChange = {
-            text = it
-        },//当输入框值发生变换时，改变text值，从而引起状态的刷新，进而重组
+            if (it != "请输入")
+                Log.d(TAG, "输入: $it")
+        },
+        //当输入框值发生变换时，改变text值，从而引起状态的刷新，进而重组
         label = { Text("请输入") }//提示
         , modifier = Modifier.wrapContentWidth(),
         textStyle = TextStyle(textAlign = TextAlign.Center, fontSize = 14.sp)
@@ -442,7 +442,7 @@ fun TextFieldValuePreview(
         mutableStateOf(
             TextFieldValue(
                 annotatedString = buildAnnotatedString {
-                    append("hi")
+                    append("小明")
 
                     withStyle(
                         style = SpanStyle(
@@ -464,7 +464,7 @@ fun TextFieldValuePreview(
 
     val showKeyboard = remember { mutableStateOf(true) }
     val focusRequester = remember { FocusRequester() }
-    val keyboard = LocalSoftwareKeyboardController.current
+    //val keyboard = LocalSoftwareKeyboardController.current
 
     // 显示键盘
     LaunchedEffect(focusRequester, block = {
@@ -476,7 +476,7 @@ fun TextFieldValuePreview(
 
             Log.d(
                 TAG,
-                "currentThread: " + Thread.currentThread().id + "mainThread: " + Looper.getMainLooper().thread.id
+                "currentThread: " + Thread.currentThread().name + "mainThread: " + Looper.getMainLooper().thread.name
             )
 
             //delay(3000)
