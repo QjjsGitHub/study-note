@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="com.example.study.broadcast" />
+    <uses-permission android:name="android.permission.REAL_GET_TASKS" />
+
+    <permission
+        android:name="com.example.study.broadcast"
+        android:label="broadcast"
+        android:protectionLevel="normal" />
+    <permission
+        android:name="com.example.study.permission.AIDL_SERVICE"
+        android:label="aidl"
+        android:protectionLevel="normal" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Study"
+        tools:targetApi="31">
+        <activity
+            android:name=".compose.ComposeActivity"
+            android:exported="false"
+            android:label="@string/title_activity_compose"
+            android:theme="@style/Theme.Study" />
+        <activity
+            android:name=".internet.InternetActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Study" />
+        <activity
+            android:name=".recyclerView.RecyclerViewActivity"
+            android:exported="false" />
+        <activity
+            android:name=".Handle.HandleActivity"
+            android:exported="false" />
+
+        <receiver
+            android:name=".broadcast.BroadcastActivity$MyBroadcastReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.example.study.broadcast" />
+            </intent-filter>
+        </receiver>
+
+        <activity
+            android:name=".broadcast.BroadcastActivity"
+            android:exported="false" />
+        <activity
+            android:name=".multiThread.ThreadActivity"
+            android:exported="false" />
+
+        <service
+            android:name=".service.BindService"
+            android:enabled="true"
+            android:exported="true"
+            android:foregroundServiceType="mediaPlayback" />
+        <service
+            android:name=".service.StartService"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="com.example.study.permission.AIDL_SERVICE"
+            android:process=":remote">
+
+            <!--
+            <intent-filter>
+                <action android:name="com.example.study.StartService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            -->
+        </service>
+
+        <activity
+            android:name=".service.ServiceActivity"
+            android:exported="true" />
+        <activity
+            android:name=".fragment.FragmentManagerActivity"
+            android:exported="false"
+            android:label="@string/title_activity_fragment_manager"
+            android:theme="@style/Theme.Study.NoActionBar" />
+        <activity
+            android:name=".fragment.BottomFragmentActivity"
+            android:exported="false"
+            android:label="@string/title_activity_bottom_fragment" />
+        <activity
+            android:name=".fragment.FragmentActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activityMode.singleInstancePerTaskActivity"
+            android:exported="false"
+            android:launchMode="singleInstancePerTask" />
+        <activity
+            android:name=".activityMode.singleTaskActivity"
+            android:exported="false"
+            android:launchMode="singleTask" />
+        <activity
+            android:name=".activityMode.SingleInstanceActivity"
+            android:exported="false"
+            android:launchMode="singleInstance" />
+        <activity
+            android:name=".activityMode.SingleTopActivity"
+            android:exported="false"
+            android:launchMode="singleTop" />
+        <activity
+            android:name=".activityMode.JavaActivity"
+            android:exported="false"
+            android:launchMode="standard" />
+        <activity
+            android:name=".ui.NormalActivity"
+            android:exported="false" />
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.Study.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
