@@ -1,6 +1,8 @@
 package com.example.study.compose
 
 import android.os.Bundle
+import android.os.Looper
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -72,7 +74,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.example.study.R
 import com.example.study.compose.ui.theme.StudyTheme
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlin.coroutines.CoroutineContext
 
 const val TAG = "ComposeActivityLOG"
 
@@ -463,13 +467,24 @@ fun TextFieldValuePreview(
     val keyboard = LocalSoftwareKeyboardController.current
 
     // 显示键盘
-    LaunchedEffect(focusRequester) {
+    LaunchedEffect(focusRequester, block = {
         if (showKeyboard.value) {
+
+            delay(1000)
+
             focusRequester.requestFocus()
-            delay(100)
-            keyboard?.show()
+
+            Log.d(
+                TAG,
+                "currentThread: " + Thread.currentThread().id + "mainThread: " + Looper.getMainLooper().thread.id
+            )
+
+            //delay(3000)
+            //输入框获得焦点就会显示软键盘，强制显示软键盘如果没有输入焦点，软键盘不会真正显示
+            //keyboard?.show()
         }
-    }
+
+    })
 
     TextField(
         modifier = Modifier
