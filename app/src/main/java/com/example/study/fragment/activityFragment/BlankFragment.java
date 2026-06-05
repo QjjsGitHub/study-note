@@ -13,9 +13,11 @@ import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
 
+import com.example.study.R;
 import com.example.study.databinding.FragmentBlankBinding;
 import com.example.study.fragment.FragmentManagerActivity;
 
@@ -64,6 +66,7 @@ public class BlankFragment extends Fragment {
         });
 
         mViewModel = new ViewModelProvider(this).get(BlankViewModel.class);
+
         mViewModel.getFragmentName().observe(getViewLifecycleOwner(), new Observer<String>() {
             @Override
             public void onChanged(String s) {
@@ -74,6 +77,25 @@ public class BlankFragment extends Fragment {
         mViewModel.setFragmentName(name);
 
         binding.fragmentName.setText(name);
+
+        binding.button46.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mViewModel.setFragmentName("viewModel更新数据");
+            }
+        });
+
+        binding.button47.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                FragmentManager fragmentManager = getParentFragmentManager();
+                fragmentManager.beginTransaction().remove(BlankFragment.this).commitNow();
+
+                /*if (container != null) {
+                    fragmentManager.beginTransaction().add(container.getId(), new BlankFragment("手动创建"), "Tag").commitNow();
+                }*/
+            }
+        });
 
         return binding.getRoot();
     }

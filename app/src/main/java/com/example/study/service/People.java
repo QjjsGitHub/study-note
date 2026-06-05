@@ -15,6 +15,7 @@ public class People implements Parcelable {
         name = "name2";
     }
 
+
     public static final Parcelable.Creator<People> CREATOR = new Parcelable.Creator<People>() {
         public People createFromParcel(Parcel in) {
             return new People(in);
@@ -27,6 +28,11 @@ public class People implements Parcelable {
 
     public People(Parcel in) {
         readFromParcel(in);
+    }
+
+    public People(int i, String newName) {
+        number = i;
+        name = newName;
     }
 
     private void readFromParcel(Parcel in) {

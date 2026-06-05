@@ -5,6 +5,7 @@ import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import com.example.study.internet.FirstFragment.User
 import io.reactivex.Observable
+import io.reactivex.ObservableEmitter
 import io.reactivex.ObservableOnSubscribe
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.CompositeDisposable
@@ -17,6 +18,13 @@ class UserViewModel : ViewModel() {
     val usersLiveData = MutableLiveData<List<User>>()
 
     private val compositeDisposable = CompositeDisposable()
+
+    open class MyObservableOnSubscribe<T>() : ObservableOnSubscribe<T> {
+        override fun subscribe(p0: ObservableEmitter<T?>) {
+
+        }
+
+    }
 
     public fun loadUsers(apiService: FirstFragment.ApiService) {
         // 发起网络请求，通过RxJava获取数据并更新LiveData
@@ -35,7 +43,7 @@ class UserViewModel : ViewModel() {
 
                         while (iterator.hasNext()) {
                             val s = iterator.next()
-                                .let { it.id.toString() + it.name + it.isActive }
+                                .let { it.id.toString() + ":" + it.name + ":" + it.isActive + " - " }
                             string += s
 
                         }
@@ -58,17 +66,41 @@ class UserViewModel : ViewModel() {
 
         val list = ArrayList<User>(10)
 
-        list.add(User(10, "one1"))
-        list.add(User(11, "one2"))
-        list.add(User(12, "one3"))
-        list.add(User(13, "one4"))
-        list.add(User(14, "one5"))
 
-        return Observable.create<List<User>>(ObservableOnSubscribe<List<User>> { emitter ->
-            emitter.onNext(list) // 发送值
-            emitter.onComplete() // 完成发射
-        })
+        //object : ObservableEmitter<List<User>> {}
+
+        return Observable.create<List<User>>(
+
+            object : ObservableOnSubscribe<List<User>> {
+
+                override fun subscribe(emitter: ObservableEmitter<List<User>?>) {
+
+                    list.add(User(10, "one1"))
+                    emitter.onNext(list) // 发送值
+                    Thread.sleep(1000)
+                    list.add(User(11, "one2"))
+                    emitter.onNext(list) // 发送值
+                    Thread.sleep(1000)
+                    list.add(User(12, "one3"))
+                    emitter.onNext(list) // 发送值
+                    Thread.sleep(1000)
+                    list.add(User(13, "one4"))
+                    emitter.onNext(list) // 发送值
+                    Thread.sleep(1000)
+                    list.add(User(14, "one5"))
+                    emitter.onNext(list) // 发送值
+                    Thread.sleep(1000)
+
+                    emitter.onComplete() // 完成发射
+
+
+                }
+
+            }
+
+        )
     }
+
 
     override fun onCleared() {
         // ViewModel销毁时取消所有订阅

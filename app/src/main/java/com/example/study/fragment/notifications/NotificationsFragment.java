@@ -28,7 +28,7 @@ public class NotificationsFragment extends Fragment {
 
         Log.d(BottomFragmentActivity.JAVA_FRAGMENT_AND_ACTIVITY_LIFE, getClass().getName().
                 substring(getClass().getName().lastIndexOf(".") + 1) + "  :  " + "state"
-                + "  :  " + "onAttach" + "  Thread : "
+                + "  :  " + "onCreateView" + "  Thread : "
                 + Thread.currentThread().getId());
 
         NotificationsViewModel notificationsViewModel =
@@ -37,8 +37,11 @@ public class NotificationsFragment extends Fragment {
         binding = FragmentNotificationsBinding.inflate(inflater, container, false);
         View root = binding.getRoot();
 
+
         final TextView textView = binding.textNotifications;
         notificationsViewModel.getText().observe(getViewLifecycleOwner(), textView::setText);
+
+        notificationsViewModel.setText("通知");
         return root;
     }
 

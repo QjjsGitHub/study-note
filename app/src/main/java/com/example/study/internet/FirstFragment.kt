@@ -227,7 +227,7 @@ class FirstFragment : Fragment() {
 
         viewModel.usersLiveData.observe(viewLifecycleOwner, Observer { usersLiveData ->
             // 更新UI，比如刷新列表
-            binding.textviewFirst.text = usersLiveData.iterator().next().name
+            binding.textviewFirst.text = usersLiveData.last().name
             /*usersLiveData.iterator().next()
                 .let { return@let it.id.toString() + ":" + it.name + it.isActive }*/
             Log.d("UserActivity", "Active users count: ${usersLiveData.size}")

@@ -1,8 +1,11 @@
 package com.example.study.service;
 
+import android.Manifest;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
@@ -10,8 +13,10 @@ import android.util.Log;
 import android.view.View;
 
 import androidx.activity.EdgeToEdge;
-import androidx.annotation.MainThread;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -28,6 +33,10 @@ public class ServiceActivity extends AppCompatActivity {
     private boolean isBound = false;
     private boolean isAidlBound = false;
 
+    //前台服务不需要申请通知权限
+    private ActivityResultLauncher<String> requestPermissionLauncher;
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -43,6 +52,22 @@ public class ServiceActivity extends AppCompatActivity {
             return insets;
         });
 
+
+        requestPermissionLauncher = registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
+            if (isGranted) {
+                // 权限被授予，可以进行通知操作
+            } else {
+                // 权限被拒绝，处理这种情况，例如提示用户手动开启权限
+            }
+        });
+
+        binding.button48.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                requestNotification();
+            }
+        });
+
         Intent serviceIntent = new Intent(ServiceActivity.this, BindService.class);
         binding.button13.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -51,7 +76,8 @@ public class ServiceActivity extends AppCompatActivity {
                 //Looper
                 //Log.d(ServiceActivity.TAG, "MainThread:" +   "  state :onClick startService ");
                 Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :onClick startService ");
-                startService(serviceIntent);
+                //startService(serviceIntent);
+                startForegroundService(serviceIntent);
             }
         });
 
@@ -101,9 +127,32 @@ public class ServiceActivity extends AppCompatActivity {
                 if (myBinder != null) {
                     myBinder.getCount();
                 }
+
+                if (iMyAidlInterface != null) {
+                    Bundle bundle = new Bundle();
+                    bundle.putParcelable("people", new People(5, "newName"));
+                    try {
+                        iMyAidlInterface.savePeople(bundle);
+                    } catch (RemoteException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+
             }
         });
 
+    }
+
+    private void requestNotification() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) { // API 33 (Android 13) 以上版本需要动态请求该权限
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
+            } else {
+                // 已经拥有权限，可以直接发送通知
+            }
+        } else {
+            // API 33以下版本，不需要动态请求POST_NOTIFICATIONS权限，只需要在Manifest中声明即可
+        }
     }
 
     @Override
@@ -112,18 +161,21 @@ public class ServiceActivity extends AppCompatActivity {
         if (isBound) {
             unbindService(myServiceConnection);
             isBound = false;
+            myBinder = null;
         }
         if (isAidlBound) {
             unbindService(myAidlServiceConnection);
             isAidlBound = false;
+            iMyAidlInterface = null;
         }
     }
 
 
+    private IMyAidlInterface iMyAidlInterface;
     private final ServiceConnection myAidlServiceConnection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
-            IMyAidlInterface iMyAidlInterface = IMyAidlInterface.Stub.asInterface(service);
+            iMyAidlInterface = IMyAidlInterface.Stub.asInterface(service);
             Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :onServiceConnected ");
             try {
                 Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :sayHi "
@@ -143,7 +195,7 @@ public class ServiceActivity extends AppCompatActivity {
         @Override
         public void onServiceDisconnected(ComponentName name) {
             Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :onServiceDisconnected ");
-            //myBinder.getCount();
+            iMyAidlInterface = null;
         }
     };
 
@@ -164,5 +216,6 @@ public class ServiceActivity extends AppCompatActivity {
             //myBinder.getCount();
         }
     };
+
 
 }

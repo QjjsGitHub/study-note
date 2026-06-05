@@ -51,8 +51,12 @@ public class HomeFragment1 extends Fragment {
             public void onClick(View v) {
                 FragmentManager fragmentManager = getActivity().getSupportFragmentManager();
                 Fragment fragment = fragmentManager.getPrimaryNavigationFragment();
-                fragmentManager.beginTransaction().hide(fragment).add(R.id.nav_fragment, tempFragment, "temp")
-                        .show(fragment).commitNow();
+                /*fragmentManager.beginTransaction().add(R.id.nav_fragment, tempFragment, "temp")
+                        .commitNow();*/
+
+
+                fragmentManager.beginTransaction().replace(R.id.nav_fragment, tempFragment).commitNow();
+
 
                 new Handler().
                         postDelayed(new Runnable() {

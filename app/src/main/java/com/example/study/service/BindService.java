@@ -11,12 +11,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.os.Binder;
-import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
-import androidx.annotation.RequiresApi;
 import androidx.core.app.NotificationCompat;
 import androidx.core.graphics.drawable.IconCompat;
 
@@ -120,7 +118,6 @@ public class BindService extends Service {
         super.onDestroy();
     }
 
-    @SuppressLint("ForegroundServiceType")
     void setForegroundService() {
 
         String channelId = "channelId";
@@ -180,10 +177,9 @@ public class BindService extends Service {
             this.bindService = bindService;
         }
 
-        public int getCount() {
+        public void getCount() {
             Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() +
                     "  执行service_bind_get_count: " + bindService.getCount());
-            return bindService.getCount();
         }
 
     }

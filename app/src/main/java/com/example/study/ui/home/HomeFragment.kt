@@ -13,10 +13,12 @@ import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
+import com.example.study.Coroutine.CoroutineActivity
 import com.example.study.Handle.HandleActivity
 import com.example.study.MainActivity
 import com.example.study.activityMode.JavaActivity
 import com.example.study.compose.ComposeActivity
+import com.example.study.dataTransform.DataActivity
 import com.example.study.databinding.FragmentHomeBinding
 import com.example.study.fragment.BottomFragmentActivity
 import com.example.study.fragment.FragmentActivity
@@ -122,6 +124,17 @@ class HomeFragment : Fragment() {
             startActivity(intent)
         }
 
+        binding.button49.setOnClickListener() {
+
+            val intent: Intent = Intent().setComponent(
+                ComponentName(
+                    "com.example.study",
+                    "com.example.study.workManager.WorkManagerActivity"
+                )
+            )
+            startActivity(intent)
+        }
+
         /* 线程 */
         binding.button19.setOnClickListener() {
 
@@ -160,6 +173,18 @@ class HomeFragment : Fragment() {
         binding.button34.setOnClickListener() {
 
             val intent: Intent = Intent(context, RecyclerViewActivity::class.java)
+            startActivity(intent)
+        }
+
+        binding.button44.setOnClickListener() {
+
+            val intent: Intent = Intent(context, CoroutineActivity::class.java)
+            startActivity(intent)
+        }
+
+        binding.button45.setOnClickListener() {
+
+            val intent: Intent = Intent(context, DataActivity::class.java)
             startActivity(intent)
         }
 

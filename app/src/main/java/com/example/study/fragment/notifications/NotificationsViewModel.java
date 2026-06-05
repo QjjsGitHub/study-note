@@ -16,4 +16,8 @@ public class NotificationsViewModel extends ViewModel {
     public LiveData<String> getText() {
         return mText;
     }
+
+    public void setText(String s) {
+        mText.postValue(s);
+    }
 }

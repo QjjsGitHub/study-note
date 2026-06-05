@@ -27,15 +27,20 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxDefaults
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -74,151 +79,171 @@ import kotlinx.coroutines.delay
 const val TAG = "ComposeActivityLOG"
 
 class ComposeActivity : ComponentActivity() {
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            StudyTheme {
-                Scaffold(
-                    modifier = Modifier.fillMaxSize(), content = { innerPadding ->
-                        MainUi(
-                            name = "Android",
-                            modifier = Modifier.padding(innerPadding)
-                        )
-                    }
-                )
-            }
+            MainUi("Compose")
         }
-
     }
-
 
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainUi(name: String, modifier: Modifier = Modifier) {
+    StudyTheme {
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text("$name 测试应用")
+                    }, navigationIcon = {
+                        IconButton(
+                            onClick = {}
+                        ) {
+                            Icon(Icons.Filled.Menu, null)
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = {}
+                        ) {
+                            Icon(Icons.Filled.Share, null)
+                        }
+                        IconButton(
+                            onClick = {}
+                        ) {
+                            Icon(Icons.Filled.Settings, null)
+                        }
+                    })
+            },
+            content = { innerPadding ->
+                //垂直排列
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .wrapContentHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
 
-    //垂直排列
-    Column(
-        modifier = modifier
-            .wrapContentHeight()
-            .fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
 
+                    Text(
+                        text = "first $name!", textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight()
+                    )
 
-        Text(
-            text = "first $name!", textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight()
-        )
+                    HorizontalDivider(
+                        color = Color.Red,
+                        modifier = Modifier
+                            .wrapContentHeight()
+                            .fillMaxWidth()
+                            .padding(0.dp, 3.dp, 0.dp, 3.dp)
+                    )
 
-        HorizontalDivider(
-            color = Color.Red,
-            modifier = Modifier
-                .wrapContentHeight()
-                .fillMaxWidth()
-                .padding(0.dp, 3.dp, 0.dp, 3.dp)
-        )
+                    Text(
+                        text = "second $name!", textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .wrapContentHeight()
+                    )
 
-        Text(
-            text = "second $name!", textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight()
-        )
+                    HorizontalDivider(
+                        color = Color.Red,
+                        modifier = Modifier
+                            .wrapContentHeight()
+                            .fillMaxWidth()
+                            .padding(0.dp, 3.dp, 0.dp, 3.dp)
+                    )
 
-        HorizontalDivider(
-            color = Color.Red,
-            modifier = Modifier
-                .wrapContentHeight()
-                .fillMaxWidth()
-                .padding(0.dp, 3.dp, 0.dp, 3.dp)
-        )
+                    Row(
+                        modifier = Modifier
+                            .wrapContentHeight()
+                            .fillMaxWidth()
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.girl),
+                            contentDescription = "my image",
+                            alignment = Alignment.Center,
+                            /*
+                            滤镜
+                            colorFilter = ColorFilter.tint(
+                                color = Color.Red,
 
-        Row(
-            modifier = Modifier
-                .wrapContentHeight()
-                .fillMaxWidth()
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.girl),
-                contentDescription = "my image",
-                alignment = Alignment.Center,
-                /*
-                滤镜
-                colorFilter = ColorFilter.tint(
-                    color = Color.Red,
+                                blendMode = BlendMode.SrcIn
+                            ),*/
+                            modifier = Modifier
+                                .height(72.dp)
+                                .weight(1.0F, true)
+                        )
 
-                    blendMode = BlendMode.SrcIn
-                ),*/
-                modifier = Modifier
-                    .height(72.dp)
-                    .weight(1.0F, true)
-            )
+                        VerticalDivider(
+                            color = Color.Red,
+                            modifier = Modifier
+                                .height(72.dp)
+                                .width(1.dp)
+                        )
 
-            VerticalDivider(
-                color = Color.Red,
-                modifier = Modifier
-                    .height(72.dp)
-                    .width(1.dp)
-            )
+                        Image(
+                            painter = painterResource(id = R.drawable.girl),
+                            contentDescription = "my image",
+                            alignment = Alignment.Center,
+                            /*
+                            滤镜
+                            colorFilter = ColorFilter.tint(
+                                color = Color.Red,
 
-            Image(
-                painter = painterResource(id = R.drawable.girl),
-                contentDescription = "my image",
-                alignment = Alignment.Center,
-                /*
-                滤镜
-                colorFilter = ColorFilter.tint(
-                    color = Color.Red,
+                                blendMode = BlendMode.SrcIn
+                            ),*/
+                            modifier = Modifier
+                                .height(72.dp)
+                                .weight(1.0F, true)
+                        )
+                    }
 
-                    blendMode = BlendMode.SrcIn
-                ),*/
-                modifier = Modifier
-                    .height(72.dp)
-                    .weight(1.0F, true)
-            )
-        }
+                    HorizontalDivider(
+                        color = Color.Red,
+                        modifier = Modifier
+                            .wrapContentHeight()
+                            .fillMaxWidth()
+                            .padding(0.dp, 3.dp, 0.dp, 3.dp)
+                    )
 
-        HorizontalDivider(
-            color = Color.Red,
-            modifier = Modifier
-                .wrapContentHeight()
-                .fillMaxWidth()
-                .padding(0.dp, 3.dp, 0.dp, 3.dp)
-        )
+                    Spacer(
+                        modifier = Modifier
+                            .height(16.dp)
+                            .fillMaxWidth()
+                    )
 
-        Spacer(
-            modifier = Modifier
-                .height(16.dp)
-                .fillMaxWidth()
-        )
+                    MyTextField()
 
-        MyTextField()
+                    Spacer(
+                        modifier = Modifier
+                            .height(16.dp)
+                            .fillMaxWidth()
+                    )
 
-        Spacer(
-            modifier = Modifier
-                .height(16.dp)
-                .fillMaxWidth()
-        )
+                    TextFieldValuePreview()
 
-        TextFieldValuePreview()
+                    //val users = listOf(User(), User(), User(), User(), User(), User()) // 示例数据
+                    val users = remember {
+                        mutableStateListOf<User>().apply {
+                            for (i in 0..10) {
+                                add(User(name = "人机 $i"))
+                            }
+                        }
+                    }
 
-        //val users = listOf(User(), User(), User(), User(), User(), User()) // 示例数据
-        val users = remember {
-            mutableStateListOf<User>().apply {
-                for (i in 0..10) {
-                    add(User(name = "人机 $i"))
+                    ListView(users, modifier)
                 }
             }
-        }
-
-        ListView(users, modifier)
-
+        )
     }
-
 }
 
 
@@ -502,9 +527,5 @@ fun TextFieldValuePreview(
 @Preview(showBackground = true)
 @Composable
 fun MainUiPreview() {
-    StudyTheme {
-
-        MainUi("Android")
-
-    }
+    MainUi("Compose")
 }

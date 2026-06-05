@@ -1,5 +1,6 @@
 [versions]
 agp = "9.1.1"
+coilCompose = "2.7.0"
 composeBom = "2026.05.00"
 converterGson = "3.0.0"
 kotlin = "2.3.21"
@@ -25,12 +26,15 @@ legacySupportV4 = "1.0.0"
 retrofit = "3.0.0"
 rxandroid = "2.1.1"
 activityKtx = "1.13.0"
+workRuntimeKtx = "2.11.2"
 
 [libraries]
 adapter-rxjava2 = { module = "com.squareup.retrofit2:adapter-rxjava2", version.ref = "converterGson" }
 androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtx" }
+coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coilCompose" }
 converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref = "converterGson" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

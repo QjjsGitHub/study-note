@@ -93,7 +93,7 @@ public class RecyclerViewActivity extends AppCompatActivity {
                 View child = parent.getChildAt(i);
                 RecyclerView.LayoutParams params = (RecyclerView.LayoutParams) child.getLayoutParams();
                 int top = child.getBottom() + params.bottomMargin;
-                int bottom = top + 900;
+                int bottom = top + 600;
                 //int bottom = top + divider.getIntrinsicHeight();
                 divider.setBounds(left, top, right, bottom);
                 divider.draw(c);
@@ -102,7 +102,7 @@ public class RecyclerViewActivity extends AppCompatActivity {
 
         @Override
         public void getItemOffsets(Rect outRect, View view, RecyclerView parent, RecyclerView.State state) {
-            outRect.set(0, 0, 0, 900);
+            outRect.set(0, 0, 0, 600);
         }
     }
 

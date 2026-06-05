@@ -49,14 +49,21 @@ dependencies {
 
 
     implementation(libs.androidx.activity.ktx)
-    implementation (libs.rxandroid)
-    implementation (libs.logging.interceptor)
-    implementation (libs.retrofit)
-    implementation (libs.converter.gson)
-    implementation (libs.adapter.rxjava2)
+    implementation(libs.rxandroid)
+    implementation(libs.logging.interceptor)
+    implementation(libs.retrofit)
+    implementation(libs.converter.gson)
+    implementation(libs.adapter.rxjava2)
 
 
     implementation(libs.leakcanary.android)
+
+
+    //implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation(libs.coil.compose)
+
+    //implementation("androidx.work:work-runtime-ktx:2.11.2")
+    implementation(libs.androidx.work.runtime.ktx)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)

@@ -2,8 +2,10 @@ package com.example.study.fragment;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.PersistableBundle;
 import android.util.Log;
+import android.view.View;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -17,11 +19,11 @@ import androidx.navigation.ui.NavigationUI;
 
 import com.example.study.R;
 import com.example.study.databinding.ActivityBottomFragmentBinding;
+import com.example.study.fragment.home.HomeFragment1;
+import com.example.study.fragment.notifications.NotificationsFragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 public class BottomFragmentActivity extends AppCompatActivity {
-
-    private ActivityBottomFragmentBinding binding;
 
     public static final String JAVA_FRAGMENT_AND_ACTIVITY_LIFE = "JavaFragmentAndActivityLife";
 
@@ -34,7 +36,7 @@ public class BottomFragmentActivity extends AppCompatActivity {
         Log.d(JAVA_FRAGMENT_AND_ACTIVITY_LIFE, getClass().getName().substring(
                 getClass().getName().lastIndexOf(".") + 1) + "onCreate");
 
-        binding = ActivityBottomFragmentBinding.inflate(getLayoutInflater());
+        ActivityBottomFragmentBinding binding = ActivityBottomFragmentBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
         BottomNavigationView navView = findViewById(R.id.nav_view);
@@ -58,6 +60,30 @@ public class BottomFragmentActivity extends AppCompatActivity {
         NavController navController = Navigation.findNavController(this, R.id.nav_fragment);
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);
         NavigationUI.setupWithNavController(binding.navView, navController);
+
+        binding.floatingActionButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                FragmentManager fragmentManager = getSupportFragmentManager();
+                Fragment fragment = fragmentManager.getPrimaryNavigationFragment();
+                /*fragmentManager.beginTransaction().add(R.id.nav_fragment, tempFragment, "temp")
+                        .commitNow();*/
+                Fragment tempFragment = new NotificationsFragment();
+
+                fragmentManager.beginTransaction().add(R.id.nav_fragment, new HomeFragment1()).commitNow();
+                fragmentManager.beginTransaction().replace(R.id.nav_fragment, tempFragment).commitNow();
+
+
+                new Handler().
+                        postDelayed(new Runnable() {
+                            @Override
+                            public void run() {
+                                FragmentManager fragmentManager = getSupportFragmentManager();
+                                fragmentManager.beginTransaction().remove(tempFragment).commitNow();
+                            }
+                        }, 3000);
+            }
+        });
 
     }
 
