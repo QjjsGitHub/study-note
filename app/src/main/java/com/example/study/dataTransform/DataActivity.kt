@@ -369,7 +369,7 @@ fun MainUI(name: String, modifier: Modifier = Modifier) {
                             modifier = Modifier
                                 .wrapContentHeight(),
                             onValueChange = { newText ->
-                                // 只允许输入数字，允许删除字符（使用filter）
+                                // 只允许输入数字，允许删除字符（使用.filterfilter）
                                 id.value = newText.filter { it.isDigit() }
                             },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)

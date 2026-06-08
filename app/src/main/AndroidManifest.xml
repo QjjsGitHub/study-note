@@ -32,14 +32,14 @@
 
         <!-- 方式2：通过 provider 的 authorities 声明（更精确） -->
         <provider android:authorities="com.example.study.dataTransform.MyContentProvider" />
-    </queries>
-
-    <!--声明隐式意图是图片-->
+    </queries> <!-- 声明隐式意图是图片 -->
     <queries>
         <package android:name="com.example.background" />
+
         <intent>
             <action android:name="android.intent.action.VIEW" />
-            <data android:mimeType="image/png"/>
+
+            <data android:mimeType="image/png" />
         </intent>
     </queries>
 
@@ -55,6 +55,11 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Study"
         tools:targetApi="31">
+        <activity
+            android:name=".flow.FlowActivity"
+            android:exported="false"
+            android:label="@string/title_activity_flow"
+            android:theme="@style/Theme.Study" />
         <activity
             android:name=".workManager.WorkManagerActivity"
             android:exported="false"
@@ -177,6 +182,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".videoPlayer.VideoPlayerActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:theme="@style/Theme.Study.NoActionBar" />
     </application>
 
 </manifest>

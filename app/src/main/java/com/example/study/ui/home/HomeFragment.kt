@@ -25,6 +25,7 @@ import com.example.study.fragment.FragmentActivity
 import com.example.study.internet.InternetActivity
 import com.example.study.recyclerView.RecyclerViewActivity
 import com.example.study.ui.NormalActivity
+import com.example.study.videoPlayer.VideoPlayerActivity
 
 class HomeFragment : Fragment() {
 
@@ -188,12 +189,19 @@ class HomeFragment : Fragment() {
             startActivity(intent)
         }
 
+        binding.button50.setOnClickListener { toFlow() }
+
+        binding.buttonVideoPlayer.setOnClickListener {
+            startActivity(Intent(context, VideoPlayerActivity::class.java))
+        }
+
         Log.d(
             MainActivity.KOTLIN_FRAGMENT_AND_ACTIVITY_LIFE, javaClass.name.substring
                 (javaClass.name.lastIndexOf(".") + 1) + "  :  " + "state" + "  :  " + "onCreateViewOver"
         )
         return root
     }
+
 
     override fun onAttach(context: Context) {
         Log.d(
@@ -306,5 +314,17 @@ class HomeFragment : Fragment() {
             MainActivity.KOTLIN_FRAGMENT_AND_ACTIVITY_LIFE, javaClass.name.substring
                 (javaClass.name.lastIndexOf(".") + 1) + "  :  " + "state" + "  :  " + "onDetachOver"
         )
+    }
+
+    fun toFlow() {
+
+        val intent: Intent = Intent().setComponent(
+            ComponentName(
+                "com.example.study",
+                "com.example.study.flow.FlowActivity"
+            )
+        )
+        startActivity(intent)
+
     }
 }

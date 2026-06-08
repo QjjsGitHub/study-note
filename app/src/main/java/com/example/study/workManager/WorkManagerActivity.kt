@@ -15,7 +15,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -23,8 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.Observer
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.work.Data
@@ -93,11 +90,20 @@ fun MainUI(name: String, modifier: Modifier = Modifier, myViewModel: MyViewModel
 
 
             myViewModel.getMyWorkInfos()
-                .observe(lifecycleOwner, Observer() { workInfos ->
+                .observe(lifecycleOwner, object : Observer<List<WorkInfo>> {
 
-                    if (workInfos != null) {
+                    override fun onChanged(workInfos: List<WorkInfo>) {
 
-                        for (workInfo in workInfos) {
+                    }
+
+                })
+
+            myViewModel.getMyWorkInfos()
+                .observe(lifecycleOwner, object : Observer<List<WorkInfo>> {
+
+                    override fun onChanged(value: List<WorkInfo>) {
+
+                        for (workInfo in value) {
 
                             val task =
                                 when (workInfo.id) {
@@ -141,7 +147,6 @@ fun MainUI(name: String, modifier: Modifier = Modifier, myViewModel: MyViewModel
                             }
                         }
                     }
-
 
                 })
 
