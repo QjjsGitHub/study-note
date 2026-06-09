@@ -1,9 +1,5 @@
 package com.example.study.videoPlayer.ui.screens
 
-import android.graphics.Bitmap
-import android.os.Build
-import android.util.LruCache
-import android.util.Size
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -41,7 +37,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,25 +47,28 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.net.toUri
+import com.example.study.videoPlayer.ThumbnailCache
 import com.example.study.videoPlayer.model.VideoItem
 import com.example.study.videoPlayer.ui.theme.VideoAccent
 import com.example.study.videoPlayer.ui.theme.VideoControlBg
 import com.example.study.videoPlayer.ui.theme.VideoOnSurfaceVariant
 import com.example.study.videoPlayer.ui.theme.VideoPrimary
 import com.example.study.videoPlayer.ui.theme.VideoSurfaceVariant
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
-/** 缩略图内存缓存，按 KB 计算单张占用，最多缓存 50 张 */
-private val thumbnailCache = object : LruCache<String, Bitmap>(50) {
-    override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
-}
+// 预创建 shape / 颜色，避免组合中反复 new
+private val CardShape = RoundedCornerShape(12.dp)
+private val BadgeShape = RoundedCornerShape(4.dp)
+private val CardBg = VideoSurfaceVariant.copy(alpha = 0.4f)
+private val HeaderBg = VideoSurfaceVariant.copy(alpha = 0.5f)
+private val BadgeBg = VideoPrimary.copy(alpha = 0.15f)
+private val ResolutionTint = VideoPrimary.copy(alpha = 0.7f)
+private val AccentBg = VideoAccent.copy(alpha = 0.8f)
+private val PlayIconTintWith = Color.White.copy(alpha = 0.9f)
+private val PlayIconTintWithout = VideoPrimary.copy(alpha = 0.7f)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -124,10 +122,7 @@ fun VideoListScreen(
                         ) {
                             DropdownMenuItem(
                                 text = { Text("刷新列表") },
-                                onClick = {
-                                    showMenu = false
-                                    onRefresh()
-                                }
+                                onClick = { showMenu = false; onRefresh() }
                             )
                             DropdownMenuItem(
                                 text = { Text("排序方式") },
@@ -135,10 +130,7 @@ fun VideoListScreen(
                             )
                             DropdownMenuItem(
                                 text = { Text("扫描目录") },
-                                onClick = {
-                                    showMenu = false
-                                    onScan()
-                                }
+                                onClick = { showMenu = false; onScan() }
                             )
                         }
                     }
@@ -151,7 +143,6 @@ fun VideoListScreen(
         }
     ) { padding ->
         if (videos.isEmpty()) {
-            // 空状态
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -190,39 +181,33 @@ fun VideoListScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // 头部统计信息
-                item(span = { GridItemSpan(2) }) {
-                    StorageInfoHeader(videos)
-                }
+                item(span = { GridItemSpan(2) }) { StorageInfoHeader(videos) }
                 // 视频列表
                 items(videos, key = { it.id }) { video ->
-                    VideoCard(
-                        video = video,
-                        onClick = { onVideoClick(video) }
-                    )
+                    VideoCard(video = video, onClick = { onVideoClick(video) })
                 }
                 // 底部间距
                 item(span = { GridItemSpan(2) }) {
                     Spacer(modifier = Modifier.height(16.dp))
                 }
             }
-        } // end else
+        }
     }
 }
 
+// ─── Header ──────────────────────────────────────────────────────────────────
+
 @Composable
 private fun StorageInfoHeader(videos: List<VideoItem>) {
-    // remember 缓存 sumOf 结果，避免每次重组都遍历全列表
     val totalCount = videos.size
     val totalGb = remember(videos) {
-        val totalBytes = videos.sumOf { it.fileSizeBytes }
-        totalBytes / (1024.0 * 1024.0 * 1024.0)
+        videos.sumOf { it.fileSizeBytes } / (1024.0 * 1024.0 * 1024.0)
     }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(VideoSurfaceVariant.copy(alpha = 0.5f))
+            .background(HeaderBg, shape = CardShape)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -245,126 +230,60 @@ private fun StorageInfoHeader(videos: List<VideoItem>) {
             style = MaterialTheme.typography.labelSmall,
             color = VideoPrimary,
             modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
-                .background(VideoPrimary.copy(alpha = 0.15f))
+                .background(BadgeBg, shape = BadgeShape)
                 .padding(horizontal = 8.dp, vertical = 4.dp)
         )
     }
 }
 
+// ─── Item Card ────────────────────────────────────────────────────────────────
+
 @Composable
-private fun VideoCard(
-    video: VideoItem,
-    onClick: () -> Unit
-) {
-    Box(
+private fun VideoCard(video: VideoItem, onClick: () -> Unit) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .background(VideoSurfaceVariant.copy(alpha = 0.4f))
+            .background(CardBg, shape = CardShape)
             .clickable(onClick = onClick)
     ) {
-        Column {
+        // 缩略图
+        ThumbnailPlaceholder(video)
 
+        Text(
+            text = video.title,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            fontWeight = FontWeight.Medium,
+            lineHeight = 18.sp,
+            modifier = Modifier.padding(8.dp, 8.dp, 8.dp, 8.dp)
+        )
 
-            // 视频信息
-            Column(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
-            )
-            {
-
-                // 缩略图占位区域
-                ThumbnailPlaceholder(video)
-
-                Text(
-                    text = video.title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    fontWeight = FontWeight.Medium,
-                    lineHeight = 18.sp
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = video.formattedDuration,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = VideoOnSurfaceVariant
-                    )
-                    Text(
-                        text = " · ",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = VideoOnSurfaceVariant
-                    )
-                    Text(
-                        text = video.formattedSize,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = VideoOnSurfaceVariant
-                    )
-                }
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = video.resolution,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = VideoPrimary.copy(alpha = 0.7f)
-                )
-            }
-        }
+        Text(
+            video.formattedDuration + " · " + video.formattedSize,
+            style = MaterialTheme.typography.labelSmall,
+            color = VideoOnSurfaceVariant,
+            modifier = Modifier.padding(10.dp, 0.dp, 10.dp, 8.dp)
+        )
     }
 }
 
+// ─── Thumbnail ────────────────────────────────────────────────────────────────
+
 @Composable
 private fun ThumbnailPlaceholder(video: VideoItem) {
-    val context = LocalContext.current
-    var thumbnail by remember(video.thumbnailPath) { mutableStateOf<Bitmap?>(null) }
-
-    // 异步加载视频缩略图
-    LaunchedEffect(video.thumbnailPath) {
-        val path = video.thumbnailPath ?: return@LaunchedEffect
-
-        // 1. 先查内存缓存
-        thumbnailCache.get(path)?.let {
-            thumbnail = it
-            return@LaunchedEffect
-        }
-
-        // 2. 缓存未命中，在 IO 线程加载
-        val bitmap = withContext(Dispatchers.IO) {
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    context.contentResolver.loadThumbnail(
-                        path.toUri(),
-                        Size(512, 288),
-                        null
-                    )
-                } else {
-                    null
-                }
-            } catch (_: Exception) {
-                null
-            }
-        }
-
-        // 3. 写缓存 + 更新 UI
-        if (bitmap != null) {
-            thumbnailCache.put(path, bitmap)
-            thumbnail = bitmap
-        }
-    }
+    // 同步读缓存。预加载完成后 Activity 刷新 videoList 引用触发重组，重新读到位图。
+    val bitmap = ThumbnailCache.get(video.thumbnailPath)
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(16f / 9f)
-            .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
             .background(VideoSurfaceVariant),
         contentAlignment = Alignment.Center
     ) {
-        // 视频缩略图
-        val bitmap = thumbnail
         if (bitmap != null) {
             Image(
                 bitmap = bitmap.asImageBitmap(),
@@ -374,11 +293,11 @@ private fun ThumbnailPlaceholder(video: VideoItem) {
             )
         }
 
-        // 播放图标（有缩略图时半透明叠加）
+        // 播放图标
         Icon(
             imageVector = Icons.Default.PlayArrow,
             contentDescription = null,
-            tint = if (bitmap != null) Color.White.copy(alpha = 0.9f) else VideoPrimary.copy(alpha = 0.7f),
+            tint = PlayIconTintWith,
             modifier = Modifier.size(40.dp)
         )
 
@@ -387,9 +306,8 @@ private fun ThumbnailPlaceholder(video: VideoItem) {
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(6.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(VideoControlBg)
-                .padding(horizontal = 6.dp, vertical = 3.dp)
+                .background(VideoControlBg, shape = BadgeShape)
+                .padding(horizontal = 3.dp, vertical = 0.dp)
         ) {
             Text(
                 text = video.formattedDuration,
@@ -404,9 +322,8 @@ private fun ThumbnailPlaceholder(video: VideoItem) {
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(6.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(VideoAccent.copy(alpha = 0.8f))
-                .padding(horizontal = 6.dp, vertical = 3.dp)
+                .background(AccentBg, shape = BadgeShape)
+                .padding(horizontal = 3.dp, vertical = 0.dp)
         ) {
             Text(
                 text = video.resolution,

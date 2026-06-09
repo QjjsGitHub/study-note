@@ -233,7 +233,7 @@ fun MainUi(name: String, modifier: Modifier = Modifier) {
                     //val users = listOf(User(), User(), User(), User(), User(), User()) // 示例数据
                     val users = remember {
                         mutableStateListOf<User>().apply {
-                            for (i in 0..10) {
+                            for (i in 0..100) {
                                 add(User(name = "人机 $i"))
                             }
                         }

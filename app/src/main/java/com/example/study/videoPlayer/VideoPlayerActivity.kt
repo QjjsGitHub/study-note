@@ -135,6 +135,10 @@ class VideoPlayerActivity : ComponentActivity() {
                     VideoScanner.scanAllVideos(contentResolver)
                 }
 
+                // 后台预加载缩略图
+                ThumbnailCache.preloadAll(contentResolver, videos)
+
+                // 预加载完成后，用新引用触发重组，让 ThumbnailPlaceholder 重新读缓存
                 videoList = videos
                 hasScanned = true
 
