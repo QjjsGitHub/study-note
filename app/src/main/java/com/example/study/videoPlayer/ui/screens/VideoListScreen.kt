@@ -30,8 +30,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VideoLibrary
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,22 +49,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import com.example.study.videoPlayer.model.VideoItem
 import com.example.study.videoPlayer.ui.theme.VideoAccent
 import com.example.study.videoPlayer.ui.theme.VideoControlBg
 import com.example.study.videoPlayer.ui.theme.VideoOnSurfaceVariant
 import com.example.study.videoPlayer.ui.theme.VideoPrimary
 import com.example.study.videoPlayer.ui.theme.VideoSurfaceVariant
-import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -184,39 +181,42 @@ fun VideoListScreen(
             }
         } else {
             LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-            contentPadding = PaddingValues(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            // 头部统计信息
-            item(span = { GridItemSpan(2) }) {
-                StorageInfoHeader(videos)
+                columns = GridCells.Fixed(2),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentPadding = PaddingValues(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // 头部统计信息
+                item(span = { GridItemSpan(2) }) {
+                    StorageInfoHeader(videos)
+                }
+                // 视频列表
+                items(videos, key = { it.id }) { video ->
+                    VideoCard(
+                        video = video,
+                        onClick = { onVideoClick(video) }
+                    )
+                }
+                // 底部间距
+                item(span = { GridItemSpan(2) }) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
             }
-            // 视频列表
-            items(videos, key = { it.id }) { video ->
-                VideoCard(
-                    video = video,
-                    onClick = { onVideoClick(video) }
-                )
-            }
-            // 底部间距
-            item(span = { GridItemSpan(2) }) {
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-        }
         } // end else
     }
 }
 
 @Composable
 private fun StorageInfoHeader(videos: List<VideoItem>) {
+    // remember 缓存 sumOf 结果，避免每次重组都遍历全列表
     val totalCount = videos.size
-    val totalBytes = videos.sumOf { it.fileSizeBytes }
-    val totalGb = totalBytes / (1024.0 * 1024.0 * 1024.0)
+    val totalGb = remember(videos) {
+        val totalBytes = videos.sumOf { it.fileSizeBytes }
+        totalBytes / (1024.0 * 1024.0 * 1024.0)
+    }
 
     Row(
         modifier = Modifier
@@ -257,18 +257,16 @@ private fun VideoCard(
     video: VideoItem,
     onClick: () -> Unit
 ) {
-    Card(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = VideoSurfaceVariant.copy(alpha = 0.4f)
-        )
+            .clip(RoundedCornerShape(12.dp))
+            .background(VideoSurfaceVariant.copy(alpha = 0.4f))
+            .clickable(onClick = onClick)
     ) {
         Column {
             // 缩略图占位区域
-            ThumbnailPlaceholder(video)
+            //ThumbnailPlaceholder(video)
 
             // 视频信息
             Column(

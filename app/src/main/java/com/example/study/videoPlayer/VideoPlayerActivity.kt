@@ -20,19 +20,25 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
-import com.example.study.videoPlayer.model.MockVideos
+import androidx.lifecycle.lifecycleScope
 import com.example.study.videoPlayer.model.VideoItem
 import com.example.study.videoPlayer.ui.screens.VideoListScreen
 import com.example.study.videoPlayer.ui.screens.VideoPlayerScreen
 import com.example.study.videoPlayer.ui.theme.VideoPlayerTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class VideoPlayerActivity : ComponentActivity() {
 
-    /** 扫描到的本地视频列表，使用 Compose state 以便变更时触发重组 */
-    private var videoList by mutableStateOf<List<VideoItem>?>(null)
+    /** 扫描到的本地视频列表，初始为空避免 mock 数据闪烁 */
+    private var videoList by mutableStateOf<List<VideoItem>>(emptyList())
 
     /** 是否正在扫描 */
     private var isScanning by mutableStateOf(false)
+
+    /** 是否已完成首次扫描 */
+    private var hasScanned by mutableStateOf(false)
 
     /** 权限请求启动器 */
     private val requestPermissionLauncher =
@@ -48,12 +54,17 @@ class VideoPlayerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // 自动尝试扫描本地视频
+        // 自动尝试扫描
         checkPermissionAndScan()
 
         setContent {
             VideoPlayerTheme {
                 var currentVideo by remember { mutableStateOf<VideoItem?>(null) }
+
+                // 稳定回调引用，避免每次重组重建 lambda 导致子组件重组
+                val onBack = remember { { currentVideo = null } }
+                val onRefresh = remember { { checkPermissionAndScan() } }
+                val onScan = remember { { checkPermissionAndScan() } }
 
                 AnimatedContent(
                     targetState = currentVideo,
@@ -73,14 +84,14 @@ class VideoPlayerActivity : ComponentActivity() {
                     if (video != null) {
                         VideoPlayerScreen(
                             video = video,
-                            onBack = { currentVideo = null }
+                            onBack = onBack
                         )
                     } else {
                         VideoListScreen(
-                            videos = videoList ?: MockVideos.getVideos(),
+                            videos = videoList,
                             onVideoClick = { currentVideo = it },
-                            onRefresh = { checkPermissionAndScan() },
-                            onScan = { checkPermissionAndScan() }
+                            onRefresh = onRefresh,
+                            onScan = onScan
                         )
                     }
                 }
@@ -112,24 +123,44 @@ class VideoPlayerActivity : ComponentActivity() {
     }
 
     /**
-     * 扫描本地视频文件
+     * 在 IO 线程扫描本地视频，不阻塞 UI
      */
     private fun scanLocalVideos() {
         if (isScanning) return
         isScanning = true
-        try {
-            val videos = VideoScanner.scanAllVideos(contentResolver)
-            videoList = videos
-            val count = videos.size
-            if (count > 0) {
-                Toast.makeText(this, "已找到 $count 个本地视频", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "未找到本地视频文件", Toast.LENGTH_SHORT).show()
+
+        lifecycleScope.launch {
+            try {
+                val videos = withContext(Dispatchers.IO) {
+                    VideoScanner.scanAllVideos(contentResolver)
+                }
+
+                videoList = videos
+                hasScanned = true
+
+                val count = videos.size
+                if (count > 0) {
+                    Toast.makeText(
+                        this@VideoPlayerActivity,
+                        "已找到 $count 个本地视频",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    Toast.makeText(
+                        this@VideoPlayerActivity,
+                        "未找到本地视频文件",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(
+                    this@VideoPlayerActivity,
+                    "扫描失败: ${e.message}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } finally {
+                isScanning = false
             }
-        } catch (e: Exception) {
-            Toast.makeText(this, "扫描失败: ${e.message}", Toast.LENGTH_SHORT).show()
-        } finally {
-            isScanning = false
         }
     }
 }
