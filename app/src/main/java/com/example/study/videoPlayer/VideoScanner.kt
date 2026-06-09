@@ -86,6 +86,8 @@ object VideoScanner {
                         filePath = filePath,
                         durationMs = durationMs,
                         fileSizeBytes = fileSizeBytes,
+                        width = width,
+                        height = height,
                         resolution = resolution,
                         thumbnailPath = contentUri.toString()
                     )

@@ -9,7 +9,9 @@ data class VideoItem(
     val filePath: String,
     val durationMs: Long,
     val fileSizeBytes: Long,
-    val resolution: String,
+    val width: Int = 0,
+    val height: Int = 0,
+    val resolution: String = "未知",
     val thumbnailPath: String? = null
 ) {
     /** 格式化时长，如 "01:23:45" 或 "12:34"（构造时预计算，避免滚动中重复算） */

@@ -21,22 +21,21 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Fullscreen
@@ -44,7 +43,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -74,7 +72,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -82,10 +79,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.study.videoPlayer.model.VideoItem
-import com.example.study.videoPlayer.ui.theme.VideoAccent
 import com.example.study.videoPlayer.ui.theme.VideoBackground
 import com.example.study.videoPlayer.ui.theme.VideoControlBg
-import com.example.study.videoPlayer.ui.theme.VideoOnSurfaceVariant
 import com.example.study.videoPlayer.ui.theme.VideoPrimary
 import kotlinx.coroutines.delay
 import kotlin.math.roundToLong
@@ -113,8 +108,8 @@ fun VideoPlayerScreen(
     var hasError by remember { mutableStateOf(false) }
     var durationMs by remember { mutableFloatStateOf(video.durationMs.toFloat()) }
 
-    var videoWidth by remember { mutableIntStateOf(0) }
-    var videoHeight by remember { mutableIntStateOf(0) }
+    var videoWidth by remember { mutableIntStateOf(video.width) }
+    var videoHeight by remember { mutableIntStateOf(video.height) }
     var surfaceReady by remember { mutableStateOf(false) }
     var currentSurface by remember { mutableStateOf<Surface?>(null) }
 
@@ -176,7 +171,8 @@ fun VideoPlayerScreen(
         while (isPlaying && isPrepared) {
             try {
                 currentPositionMs = mediaPlayer.currentPosition.toFloat()
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
             delay(1000L)
         }
     }
@@ -191,9 +187,11 @@ fun VideoPlayerScreen(
                         isPlaying = false
                     }
                 }
+
                 Lifecycle.Event.ON_DESTROY -> {
                     mediaPlayer.release()
                 }
+
                 else -> {}
             }
         }
@@ -208,15 +206,10 @@ fun VideoPlayerScreen(
         onDispose {
             try {
                 mediaPlayer.release()
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
         }
     }
-
-    // ========== 总时长优先取真实时长 ==========
-    val totalMs = if (isPrepared && durationMs > 0) durationMs else video.durationMs.toFloat()
-    val progress = if (totalMs > 0) (currentPositionMs / totalMs).coerceIn(0f, 1f) else 0f
-    val statusBarPadding = WindowInsets.statusBars.asPaddingValues()
-    val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
 
     // 自动隐藏控件
     LaunchedEffect(showControls) {
@@ -233,9 +226,7 @@ fun VideoPlayerScreen(
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() }
-            ) {
-                showControls = !showControls
-            }
+            ) { showControls = !showControls }
     ) {
         // ========== 视频画面 ==========
         if (hasError) {
@@ -278,9 +269,13 @@ fun VideoPlayerScreen(
             // 视频宽于屏幕则按宽度约束，高于屏幕则按高度约束，始终完整可见无裁切
             val screenRatio = maxWidth / maxHeight
             val videoModifier = if (videoRatio >= screenRatio) {
-                Modifier.fillMaxWidth().aspectRatio(videoRatio)
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(videoRatio)
             } else {
-                Modifier.fillMaxHeight().aspectRatio(videoRatio)
+                Modifier
+                    .fillMaxHeight()
+                    .aspectRatio(videoRatio)
             }
 
             AndroidView(
@@ -300,7 +295,8 @@ fun VideoPlayerScreen(
                                 st: SurfaceTexture,
                                 width: Int,
                                 height: Int
-                            ) {}
+                            ) {
+                            }
 
                             override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
                                 currentSurface?.release()
@@ -391,6 +387,7 @@ fun VideoPlayerScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .statusBarsPadding()
                     .height(120.dp)
                     .background(
                         Brush.verticalGradient(
@@ -410,7 +407,7 @@ fun VideoPlayerScreen(
             exit = fadeOut()
         ) {
             TopAppBar(
-                modifier = Modifier.padding(statusBarPadding),
+                modifier = Modifier.statusBarsPadding(),
                 title = {
                     Column {
                         Text(
@@ -437,7 +434,7 @@ fun VideoPlayerScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* 更多操作 */ }) {
+                    IconButton(onClick = { "更多操作" }) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,
                             contentDescription = "更多",
@@ -456,11 +453,10 @@ fun VideoPlayerScreen(
         AnimatedVisibility(
             visible = showControls,
             enter = fadeIn(),
-            exit = fadeOut()
+            exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter),
         ) {
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .height(160.dp)
                     .background(
@@ -484,53 +480,22 @@ fun VideoPlayerScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(navBarPadding)
+                    .navigationBarsPadding()
                     .padding(horizontal = 16.dp)
                     .padding(bottom = 8.dp)
             ) {
-                // --- 进度条 + 时间 ---
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = formatTime(currentPositionMs.roundToLong()),
-                        color = Color.White.copy(alpha = 0.8f),
-                        fontSize = 12.sp,
-                        modifier = Modifier.width(44.dp),
-                        textAlign = TextAlign.Center
-                    )
-                    Slider(
-                        value = progress,
-                        onValueChange = { newProgress ->
-                            val seekMs = (newProgress * totalMs).roundToLong().toInt()
-                            if (isPrepared) {
-                                mediaPlayer.seekTo(seekMs)
-                            }
-                            currentPositionMs = seekMs.toFloat()
-                            showControls = true
-                        },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(20.dp),
-                        colors = SliderDefaults.colors(
-                            thumbColor = VideoPrimary,
-                            activeTrackColor = VideoPrimary,
-                            inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-                        )
-                    )
-                    Text(
-                        text = if (isPrepared && durationMs > 0) {
-                            formatTime(durationMs.roundToLong())
-                        } else {
-                            video.formattedDuration
-                        },
-                        color = Color.White.copy(alpha = 0.8f),
-                        fontSize = 12.sp,
-                        modifier = Modifier.width(44.dp),
-                        textAlign = TextAlign.Center
-                    )
-                }
+                ProgressBar(
+                    currentPositionMs = currentPositionMs,
+                    durationMs = durationMs,
+                    isPrepared = isPrepared,
+                    fallbackDurationMs = video.durationMs.toFloat(),
+                    fallbackDurationText = video.formattedDuration,
+                    onSeek = { seekMs ->
+                        if (isPrepared) mediaPlayer.seekTo(seekMs)
+                        currentPositionMs = seekMs.toFloat()
+                        showControls = true
+                    }
+                )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -644,8 +609,9 @@ fun VideoPlayerScreen(
                     IconButton(
                         onClick = {
                             if (isPrepared) {
+                                val limit = if (isPrepared && durationMs > 0) durationMs.toInt() else video.durationMs.toInt()
                                 val newPos = (mediaPlayer.currentPosition + 10_000)
-                                    .coerceAtMost(totalMs.toInt())
+                                    .coerceAtMost(limit)
                                 mediaPlayer.seekTo(newPos)
                                 currentPositionMs = newPos.toFloat()
                             }
@@ -672,7 +638,8 @@ fun VideoPlayerScreen(
                     IconButton(
                         onClick = {
                             val activity = context as Activity
-                            val isLandscape = context.resources.configuration.orientation== Configuration.ORIENTATION_LANDSCAPE
+                            val isLandscape =
+                                context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
                             activity.requestedOrientation = if (isLandscape) {
                                 ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                             } else {
@@ -690,17 +657,6 @@ fun VideoPlayerScreen(
                     }
                 }
 
-                // 缓冲进度指示（仅装饰）
-                LinearProgressIndicator(
-                    progress = { 0.85f },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp)
-                        .height(2.dp)
-                        .alpha(0.3f),
-                    color = VideoPrimary.copy(alpha = 0.5f),
-                    trackColor = Color.Transparent
-                )
             }
         }
 
@@ -771,6 +727,55 @@ fun VideoPlayerScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ProgressBar(
+    currentPositionMs: Float,
+    durationMs: Float,
+    isPrepared: Boolean,
+    fallbackDurationMs: Float,
+    fallbackDurationText: String,
+    onSeek: (seekMs: Int) -> Unit,
+) {
+    val totalMs = if (isPrepared && durationMs > 0) durationMs else fallbackDurationMs
+    val progress = if (totalMs > 0) (currentPositionMs / totalMs).coerceIn(0f, 1f) else 0f
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = formatTime(currentPositionMs.roundToLong()),
+            color = Color.White.copy(alpha = 0.8f),
+            fontSize = 12.sp,
+            modifier = Modifier.width(44.dp),
+            textAlign = TextAlign.Center
+        )
+        Slider(
+            value = progress,
+            onValueChange = { newProgress ->
+                onSeek((newProgress * totalMs).roundToLong().toInt())
+            },
+            modifier = Modifier.weight(1f).height(20.dp),
+            colors = SliderDefaults.colors(
+                thumbColor = VideoPrimary,
+                activeTrackColor = VideoPrimary,
+                inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+            )
+        )
+        Text(
+            text = if (isPrepared && durationMs > 0) {
+                formatTime(durationMs.roundToLong())
+            } else {
+                fallbackDurationText
+            },
+            color = Color.White.copy(alpha = 0.8f),
+            fontSize = 12.sp,
+            modifier = Modifier.width(44.dp),
+            textAlign = TextAlign.Center
+        )
     }
 }
 
