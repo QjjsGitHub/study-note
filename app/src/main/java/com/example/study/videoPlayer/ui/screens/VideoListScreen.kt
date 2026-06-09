@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -65,6 +66,7 @@ private val BadgeBg = VideoPrimary.copy(alpha = 0.15f)
 @Composable
 fun VideoListScreen(
     videos: List<VideoItem>,
+    isScanning: Boolean = false,
     onVideoClick: (VideoItem) -> Unit,
     onRefresh: () -> Unit = {},
     onScan: () -> Unit = {}
@@ -133,7 +135,35 @@ fun VideoListScreen(
             )
         }
     ) { padding ->
-        if (videos.isEmpty()) {
+        if (isScanning) {
+            // 扫描中 — 显示加载进度圈
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(
+                        color = VideoPrimary,
+                        modifier = Modifier.size(48.dp),
+                        strokeWidth = 4.dp
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text(
+                        text = "正在扫描本地视频…",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = VideoOnSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "正在搜索 .mp4 .mkv .avi .mov 等格式",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = VideoOnSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                }
+            }
+        } else if (videos.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()

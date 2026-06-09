@@ -1,6 +1,7 @@
 package com.example.study.videoPlayer
 
 import android.content.ContentResolver
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
@@ -30,6 +31,30 @@ object VideoScanner {
     )
 
     private const val SORT_ORDER = "${MediaStore.Video.Media.DATE_MODIFIED} DESC"
+
+    /**
+     * 通过 MediaMetadataRetriever 获取旋转后的真实显示宽高。
+     * MediaStore 的 WIDTH/HEIGHT 不包含旋转元数据。
+     */
+    private fun getDisplaySize(
+        filePath: String,
+        rawWidth: Int,
+        rawHeight: Int,
+    ): Pair<Int, Int> {
+        if (rawWidth <= 0 || rawHeight <= 0) return 0 to 0
+        return try {
+            val retriever = MediaMetadataRetriever()
+            retriever.setDataSource(filePath)
+            val rotation = retriever.extractMetadata(
+                MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION
+            )?.toIntOrNull() ?: 0
+            retriever.release()
+            if (rotation == 90 || rotation == 270) rawHeight to rawWidth
+            else rawWidth to rawHeight
+        } catch (_: Exception) {
+            rawWidth to rawHeight
+        }
+    }
 
     /**
      * 扫描设备上的所有本地视频
@@ -69,15 +94,18 @@ object VideoScanner {
                 val filePath = it.getString(dataColumn) ?: continue
                 val durationMs = it.getLong(durationColumn)
                 val fileSizeBytes = it.getLong(sizeColumn)
-                val width = if (widthColumn >= 0) it.getInt(widthColumn) else 0
-                val height = if (heightColumn >= 0) it.getInt(heightColumn) else 0
-                val resolution = if (width > 0 && height > 0) "${width}×${height}" else "未知"
+                val rawWidth = if (widthColumn >= 0) it.getInt(widthColumn) else 0
+                val rawHeight = if (heightColumn >= 0) it.getInt(heightColumn) else 0
 
                 // 构建视频内容 URI（用于缩略图等）
                 val contentUri = Uri.withAppendedPath(
                     MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
                     id.toString()
                 )
+
+                // MediaStore 的 WIDTH/HEIGHT 不含旋转信息，用 MediaMetadataRetriever 修正
+                val (displayWidth, displayHeight) = getDisplaySize(filePath, rawWidth, rawHeight)
+                val resolution = if (displayWidth > 0 && displayHeight > 0) "${displayWidth}×${displayHeight}" else "未知"
 
                 videos.add(
                     VideoItem(
@@ -86,8 +114,8 @@ object VideoScanner {
                         filePath = filePath,
                         durationMs = durationMs,
                         fileSizeBytes = fileSizeBytes,
-                        width = width,
-                        height = height,
+                        width = displayWidth,
+                        height = displayHeight,
                         resolution = resolution,
                         thumbnailPath = contentUri.toString()
                     )

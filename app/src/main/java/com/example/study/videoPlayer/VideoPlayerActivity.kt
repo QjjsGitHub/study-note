@@ -99,8 +99,8 @@ class VideoPlayerActivity : ComponentActivity() {
                     label = "video_navigation"
                 ) { video ->
                     if (video != null) {
-                        // 系统返回键 → 回到列表
-                        BackHandler { currentVideo = null }
+                        // 系统返回键 → 回到列表（同时恢复竖屏）
+                        BackHandler(onBack = onBack)
 
                         VideoPlayerScreen(
                             video = video,
@@ -109,6 +109,7 @@ class VideoPlayerActivity : ComponentActivity() {
                     } else {
                         VideoListScreen(
                             videos = videoList,
+                            isScanning = isScanning,
                             onVideoClick = { currentVideo = it },
                             onRefresh = onRefresh,
                             onScan = onScan
