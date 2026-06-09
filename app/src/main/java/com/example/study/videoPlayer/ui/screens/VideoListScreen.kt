@@ -265,13 +265,17 @@ private fun VideoCard(
             .clickable(onClick = onClick)
     ) {
         Column {
-            // 缩略图占位区域
-            //ThumbnailPlaceholder(video)
+
 
             // 视频信息
             Column(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
-            ) {
+            )
+            {
+
+                // 缩略图占位区域
+                ThumbnailPlaceholder(video)
+
                 Text(
                     text = video.title,
                     style = MaterialTheme.typography.bodyMedium,
