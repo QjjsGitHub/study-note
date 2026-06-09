@@ -1,13 +1,17 @@
 package com.example.study.videoPlayer
 
 import android.Manifest
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
+import coil.Coil
+import coil.ImageLoader
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -54,6 +58,14 @@ class VideoPlayerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // 注册 Coil ImageLoader：content:// 视频 URI → loadThumbnail()
+        Coil.setImageLoader(
+            ImageLoader.Builder(this)
+                .components { add(VideoThumbnailFetcher.Factory(this@VideoPlayerActivity)) }
+                .crossfade(true)
+                .build()
+        )
+
         // 自动尝试扫描
         checkPermissionAndScan()
 
@@ -62,7 +74,12 @@ class VideoPlayerActivity : ComponentActivity() {
                 var currentVideo by remember { mutableStateOf<VideoItem?>(null) }
 
                 // 稳定回调引用，避免每次重组重建 lambda 导致子组件重组
-                val onBack = remember { { currentVideo = null } }
+                val onBack = remember {
+                    {
+                        currentVideo = null
+                        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                    }
+                }
                 val onRefresh = remember { { checkPermissionAndScan() } }
                 val onScan = remember { { checkPermissionAndScan() } }
 
@@ -82,6 +99,9 @@ class VideoPlayerActivity : ComponentActivity() {
                     label = "video_navigation"
                 ) { video ->
                     if (video != null) {
+                        // 系统返回键 → 回到列表
+                        BackHandler { currentVideo = null }
+
                         VideoPlayerScreen(
                             video = video,
                             onBack = onBack
@@ -135,10 +155,6 @@ class VideoPlayerActivity : ComponentActivity() {
                     VideoScanner.scanAllVideos(contentResolver)
                 }
 
-                // 后台预加载缩略图
-                ThumbnailCache.preloadAll(contentResolver, videos)
-
-                // 预加载完成后，用新引用触发重组，让 ThumbnailPlaceholder 重新读缓存
                 videoList = videos
                 hasScanned = true
 

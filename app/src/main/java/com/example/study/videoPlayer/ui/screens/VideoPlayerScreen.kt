@@ -1,5 +1,8 @@
 package com.example.study.videoPlayer.ui.screens
 
+import android.app.Activity
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.graphics.SurfaceTexture
 import android.media.MediaPlayer
 import android.media.PlaybackParams
@@ -14,11 +17,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -55,6 +61,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -67,6 +74,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -97,7 +105,7 @@ fun VideoPlayerScreen(
     var showSpeedMenu by remember { mutableStateOf(false) }
     var playbackSpeed by remember { mutableStateOf(1.0f) }
     var showVolumeOverlay by remember { mutableStateOf(false) }
-    var showBrightnessOverlay by remember { mutableStateOf(false) }
+    var showBrightnessOverlay by remember { mutableStateOf(true) }
     var volume by remember { mutableFloatStateOf(0.7f) }
     var brightness by remember { mutableFloatStateOf(0.7f) }
 
@@ -105,6 +113,8 @@ fun VideoPlayerScreen(
     var hasError by remember { mutableStateOf(false) }
     var durationMs by remember { mutableFloatStateOf(video.durationMs.toFloat()) }
 
+    var videoWidth by remember { mutableIntStateOf(0) }
+    var videoHeight by remember { mutableIntStateOf(0) }
     var surfaceReady by remember { mutableStateOf(false) }
     var currentSurface by remember { mutableStateOf<Surface?>(null) }
 
@@ -136,10 +146,14 @@ fun VideoPlayerScreen(
                 isPrepared = true
                 mp.start()
                 isPlaying = true
-                // 应用当前播放速度
                 if (playbackSpeed != 1.0f) {
                     mp.playbackParams = PlaybackParams().setSpeed(playbackSpeed)
                 }
+            }
+
+            mediaPlayer.setOnVideoSizeChangedListener { _, width, height ->
+                videoWidth = width
+                videoHeight = height
             }
 
             mediaPlayer.setOnErrorListener { _, _, _ ->
@@ -163,7 +177,7 @@ fun VideoPlayerScreen(
             try {
                 currentPositionMs = mediaPlayer.currentPosition.toFloat()
             } catch (_: Exception) { }
-            delay(100L)
+            delay(1000L)
         }
     }
 
@@ -212,7 +226,7 @@ fun VideoPlayerScreen(
         }
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(VideoBackground)
@@ -254,6 +268,21 @@ fun VideoPlayerScreen(
                 }
             }
         } else {
+            // 根据视频原始宽高计算比例，未获取到时回退 16:9
+            val videoRatio = if (videoWidth > 0 && videoHeight > 0) {
+                videoWidth.toFloat() / videoHeight.toFloat()
+            } else {
+                16f / 9f
+            }
+
+            // 视频宽于屏幕则按宽度约束，高于屏幕则按高度约束，始终完整可见无裁切
+            val screenRatio = maxWidth / maxHeight
+            val videoModifier = if (videoRatio >= screenRatio) {
+                Modifier.fillMaxWidth().aspectRatio(videoRatio)
+            } else {
+                Modifier.fillMaxHeight().aspectRatio(videoRatio)
+            }
+
             AndroidView(
                 factory = { ctx ->
                     TextureView(ctx).apply {
@@ -284,7 +313,7 @@ fun VideoPlayerScreen(
                         }
                     }
                 },
-                modifier = Modifier.fillMaxSize()
+                modifier = videoModifier.align(Alignment.Center),
             )
 
             // 加载中指示
@@ -321,9 +350,10 @@ fun VideoPlayerScreen(
 
         // 中央大播放/暂停按钮（暂停或控件隐藏时显示）
         AnimatedVisibility(
-            visible = (!isPlaying || !showControls) && !hasError,
+            visible = showControls && !hasError,
             enter = fadeIn(),
-            exit = fadeOut()
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.Center),
         ) {
             Box(
                 modifier = Modifier
@@ -640,7 +670,15 @@ fun VideoPlayerScreen(
 
                     // 全屏/旋转
                     IconButton(
-                        onClick = { /* 全屏切换 */ },
+                        onClick = {
+                            val activity = context as Activity
+                            val isLandscape = context.resources.configuration.orientation== Configuration.ORIENTATION_LANDSCAPE
+                            activity.requestedOrientation = if (isLandscape) {
+                                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                            } else {
+                                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                            }
+                        },
                         modifier = Modifier.size(44.dp)
                     ) {
                         Icon(

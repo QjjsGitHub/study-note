@@ -1,6 +1,6 @@
 package com.example.study.videoPlayer.ui.screens
 
-import androidx.compose.foundation.Image
+import coil.compose.AsyncImage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,7 +22,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.DropdownMenu
@@ -45,15 +43,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.study.videoPlayer.ThumbnailCache
 import com.example.study.videoPlayer.model.VideoItem
-import com.example.study.videoPlayer.ui.theme.VideoAccent
 import com.example.study.videoPlayer.ui.theme.VideoControlBg
 import com.example.study.videoPlayer.ui.theme.VideoOnSurfaceVariant
 import com.example.study.videoPlayer.ui.theme.VideoPrimary
@@ -65,10 +60,6 @@ private val BadgeShape = RoundedCornerShape(4.dp)
 private val CardBg = VideoSurfaceVariant.copy(alpha = 0.4f)
 private val HeaderBg = VideoSurfaceVariant.copy(alpha = 0.5f)
 private val BadgeBg = VideoPrimary.copy(alpha = 0.15f)
-private val ResolutionTint = VideoPrimary.copy(alpha = 0.7f)
-private val AccentBg = VideoAccent.copy(alpha = 0.8f)
-private val PlayIconTintWith = Color.White.copy(alpha = 0.9f)
-private val PlayIconTintWithout = VideoPrimary.copy(alpha = 0.7f)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -243,12 +234,15 @@ private fun VideoCard(video: VideoItem, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .height(150.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(CardBg, shape = CardShape)
             .clickable(onClick = onClick)
     ) {
-        // 缩略图
+        // 缩略图 — aspectRatio 从宽度推导高度，无需文本测量
         ThumbnailPlaceholder(video)
+
+        // 固定高度文本区 — 避免每次滚动进入视野时测量文字
 
         Text(
             text = video.title,
@@ -258,15 +252,20 @@ private fun VideoCard(video: VideoItem, onClick: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
             fontWeight = FontWeight.Medium,
             lineHeight = 18.sp,
-            modifier = Modifier.padding(8.dp, 8.dp, 8.dp, 8.dp)
+            modifier = Modifier
+                .padding(start = 8.dp, top = 6.dp)
+                .height(24.dp)
         )
-
         Text(
-            video.formattedDuration + " · " + video.formattedSize,
+            text = video.resolution + " · " + video.formattedSize,
             style = MaterialTheme.typography.labelSmall,
             color = VideoOnSurfaceVariant,
-            modifier = Modifier.padding(10.dp, 0.dp, 10.dp, 8.dp)
+            maxLines = 1,
+            modifier = Modifier
+                .padding(start = 10.dp)
+                .height(16.dp)
         )
+
     }
 }
 
@@ -274,31 +273,19 @@ private fun VideoCard(video: VideoItem, onClick: () -> Unit) {
 
 @Composable
 private fun ThumbnailPlaceholder(video: VideoItem) {
-    // 同步读缓存。预加载完成后 Activity 刷新 videoList 引用触发重组，重新读到位图。
-    val bitmap = ThumbnailCache.get(video.thumbnailPath)
-
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(16f / 9f)
+            .height(100.dp)
             .background(VideoSurfaceVariant),
         contentAlignment = Alignment.Center
     ) {
-        if (bitmap != null) {
-            Image(
-                bitmap = bitmap.asImageBitmap(),
-                contentDescription = video.title,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
-        }
-
-        // 播放图标
-        Icon(
-            imageVector = Icons.Default.PlayArrow,
-            contentDescription = null,
-            tint = PlayIconTintWith,
-            modifier = Modifier.size(40.dp)
+        // Coil AsyncImage — 自动缓存、取消、线程管理
+        AsyncImage(
+            model = video.thumbnailPath,
+            contentDescription = video.title,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
         )
 
         // 时长标签（右下角）
@@ -307,29 +294,14 @@ private fun ThumbnailPlaceholder(video: VideoItem) {
                 .align(Alignment.BottomEnd)
                 .padding(6.dp)
                 .background(VideoControlBg, shape = BadgeShape)
-                .padding(horizontal = 3.dp, vertical = 0.dp)
+                .padding(horizontal = 5.dp, vertical = 0.dp)
         ) {
             Text(
                 text = video.formattedDuration,
                 color = Color.White,
                 fontSize = 11.sp,
-                fontWeight = FontWeight.Medium
-            )
-        }
-
-        // 分辨率标签（左上角）
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(6.dp)
-                .background(AccentBg, shape = BadgeShape)
-                .padding(horizontal = 3.dp, vertical = 0.dp)
-        ) {
-            Text(
-                text = video.resolution,
-                color = Color.White,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
             )
         }
     }
