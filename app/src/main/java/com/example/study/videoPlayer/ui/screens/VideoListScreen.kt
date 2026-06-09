@@ -1,5 +1,10 @@
 package com.example.study.videoPlayer.ui.screens
 
+import android.graphics.Bitmap
+import android.os.Build
+import android.util.LruCache
+import android.util.Size
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,26 +51,38 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.study.videoPlayer.model.MockVideos
 import com.example.study.videoPlayer.model.VideoItem
 import com.example.study.videoPlayer.ui.theme.VideoAccent
 import com.example.study.videoPlayer.ui.theme.VideoControlBg
 import com.example.study.videoPlayer.ui.theme.VideoOnSurfaceVariant
 import com.example.study.videoPlayer.ui.theme.VideoPrimary
 import com.example.study.videoPlayer.ui.theme.VideoSurfaceVariant
+import androidx.core.net.toUri
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/** 缩略图内存缓存，按 KB 计算单张占用，最多缓存 50 张 */
+private val thumbnailCache = object : LruCache<String, Bitmap>(50) {
+    override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoListScreen(
-    onVideoClick: (VideoItem) -> Unit
+    videos: List<VideoItem>,
+    onVideoClick: (VideoItem) -> Unit,
+    onRefresh: () -> Unit = {},
+    onScan: () -> Unit = {}
 ) {
-    val videos = remember { MockVideos.getVideos() }
     var showMenu by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -109,7 +127,10 @@ fun VideoListScreen(
                         ) {
                             DropdownMenuItem(
                                 text = { Text("刷新列表") },
-                                onClick = { showMenu = false }
+                                onClick = {
+                                    showMenu = false
+                                    onRefresh()
+                                }
                             )
                             DropdownMenuItem(
                                 text = { Text("排序方式") },
@@ -117,7 +138,10 @@ fun VideoListScreen(
                             )
                             DropdownMenuItem(
                                 text = { Text("扫描目录") },
-                                onClick = { showMenu = false }
+                                onClick = {
+                                    showMenu = false
+                                    onScan()
+                                }
                             )
                         }
                     }
@@ -129,7 +153,37 @@ fun VideoListScreen(
             )
         }
     ) { padding ->
-        LazyVerticalGrid(
+        if (videos.isEmpty()) {
+            // 空状态
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.VideoLibrary,
+                        contentDescription = null,
+                        tint = VideoOnSurfaceVariant,
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "暂无本地视频",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = VideoOnSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "点击右上角「扫描目录」查找视频文件",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = VideoOnSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                }
+            }
+        } else {
+            LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             modifier = Modifier
                 .fillMaxSize()
@@ -154,6 +208,7 @@ fun VideoListScreen(
                 Spacer(modifier = Modifier.height(16.dp))
             }
         }
+        } // end else
     }
 }
 
@@ -261,6 +316,43 @@ private fun VideoCard(
 
 @Composable
 private fun ThumbnailPlaceholder(video: VideoItem) {
+    val context = LocalContext.current
+    var thumbnail by remember(video.thumbnailPath) { mutableStateOf<Bitmap?>(null) }
+
+    // 异步加载视频缩略图
+    LaunchedEffect(video.thumbnailPath) {
+        val path = video.thumbnailPath ?: return@LaunchedEffect
+
+        // 1. 先查内存缓存
+        thumbnailCache.get(path)?.let {
+            thumbnail = it
+            return@LaunchedEffect
+        }
+
+        // 2. 缓存未命中，在 IO 线程加载
+        val bitmap = withContext(Dispatchers.IO) {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    context.contentResolver.loadThumbnail(
+                        path.toUri(),
+                        Size(512, 288),
+                        null
+                    )
+                } else {
+                    null
+                }
+            } catch (_: Exception) {
+                null
+            }
+        }
+
+        // 3. 写缓存 + 更新 UI
+        if (bitmap != null) {
+            thumbnailCache.put(path, bitmap)
+            thumbnail = bitmap
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -269,11 +361,22 @@ private fun ThumbnailPlaceholder(video: VideoItem) {
             .background(VideoSurfaceVariant),
         contentAlignment = Alignment.Center
     ) {
-        // 播放图标
+        // 视频缩略图
+        val bitmap = thumbnail
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = video.title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        }
+
+        // 播放图标（有缩略图时半透明叠加）
         Icon(
             imageVector = Icons.Default.PlayArrow,
             contentDescription = null,
-            tint = VideoPrimary.copy(alpha = 0.7f),
+            tint = if (bitmap != null) Color.White.copy(alpha = 0.9f) else VideoPrimary.copy(alpha = 0.7f),
             modifier = Modifier.size(40.dp)
         )
 

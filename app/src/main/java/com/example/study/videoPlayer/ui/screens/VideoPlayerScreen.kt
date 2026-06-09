@@ -1,5 +1,11 @@
 package com.example.study.videoPlayer.ui.screens
 
+import android.graphics.SurfaceTexture
+import android.media.MediaPlayer
+import android.media.PlaybackParams
+import android.net.Uri
+import android.view.Surface
+import android.view.TextureView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -39,13 +45,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -58,10 +64,15 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.study.videoPlayer.model.VideoItem
 import com.example.study.videoPlayer.ui.theme.VideoAccent
 import com.example.study.videoPlayer.ui.theme.VideoBackground
@@ -77,7 +88,10 @@ fun VideoPlayerScreen(
     video: VideoItem,
     onBack: () -> Unit
 ) {
-    var isPlaying by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    var isPlaying by remember { mutableStateOf(false) }
     var currentPositionMs by remember { mutableFloatStateOf(0f) }
     var showControls by remember { mutableStateOf(true) }
     var showSpeedMenu by remember { mutableStateOf(false) }
@@ -87,22 +101,108 @@ fun VideoPlayerScreen(
     var volume by remember { mutableFloatStateOf(0.7f) }
     var brightness by remember { mutableFloatStateOf(0.7f) }
 
-    val totalMs = video.durationMs.toFloat()
+    var isPrepared by remember { mutableStateOf(false) }
+    var hasError by remember { mutableStateOf(false) }
+    var durationMs by remember { mutableFloatStateOf(video.durationMs.toFloat()) }
+
+    var surfaceReady by remember { mutableStateOf(false) }
+    var currentSurface by remember { mutableStateOf<Surface?>(null) }
+
+    // 创建 MediaPlayer 实例
+    val mediaPlayer = remember { MediaPlayer() }
+
+    // ========== 准备播放器 ==========
+    LaunchedEffect(surfaceReady, video) {
+        if (!surfaceReady) return@LaunchedEffect
+
+        try {
+            mediaPlayer.reset()
+            isPrepared = false
+            hasError = false
+
+            // 优先使用 content URI，其次用文件路径
+            val contentUri = video.thumbnailPath?.let { Uri.parse(it) }
+            if (contentUri != null && contentUri.scheme == "content") {
+                mediaPlayer.setDataSource(context, contentUri)
+            } else {
+                mediaPlayer.setDataSource(video.filePath)
+            }
+
+            mediaPlayer.setSurface(currentSurface)
+            mediaPlayer.prepareAsync()
+
+            mediaPlayer.setOnPreparedListener { mp ->
+                durationMs = mp.duration.toFloat()
+                isPrepared = true
+                mp.start()
+                isPlaying = true
+                // 应用当前播放速度
+                if (playbackSpeed != 1.0f) {
+                    mp.playbackParams = PlaybackParams().setSpeed(playbackSpeed)
+                }
+            }
+
+            mediaPlayer.setOnErrorListener { _, _, _ ->
+                hasError = true
+                isPrepared = false
+                true
+            }
+
+            mediaPlayer.setOnCompletionListener {
+                isPlaying = false
+                currentPositionMs = durationMs
+            }
+        } catch (_: Exception) {
+            hasError = true
+        }
+    }
+
+    // ========== 轮询播放进度 ==========
+    LaunchedEffect(isPlaying, isPrepared) {
+        while (isPlaying && isPrepared) {
+            try {
+                currentPositionMs = mediaPlayer.currentPosition.toFloat()
+            } catch (_: Exception) { }
+            delay(100L)
+        }
+    }
+
+    // ========== 生命周期处理 ==========
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    if (isPlaying) {
+                        mediaPlayer.pause()
+                        isPlaying = false
+                    }
+                }
+                Lifecycle.Event.ON_DESTROY -> {
+                    mediaPlayer.release()
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    // ========== 组件销毁时释放 ==========
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                mediaPlayer.release()
+            } catch (_: Exception) { }
+        }
+    }
+
+    // ========== 总时长优先取真实时长 ==========
+    val totalMs = if (isPrepared && durationMs > 0) durationMs else video.durationMs.toFloat()
     val progress = if (totalMs > 0) (currentPositionMs / totalMs).coerceIn(0f, 1f) else 0f
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues()
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
-
-    // 模拟播放进度（仅UI演示）
-    LaunchedEffect(isPlaying) {
-        while (isPlaying && currentPositionMs < totalMs) {
-            delay(100L)
-            currentPositionMs = (currentPositionMs + 100f * playbackSpeed).coerceAtMost(totalMs)
-        }
-        if (currentPositionMs >= totalMs) {
-            isPlaying = false
-            currentPositionMs = totalMs
-        }
-    }
 
     // 自动隐藏控件
     LaunchedEffect(showControls) {
@@ -123,64 +223,132 @@ fun VideoPlayerScreen(
                 showControls = !showControls
             }
     ) {
-        // ========== 视频画面区域（占位） ==========
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(VideoBackground),
-            contentAlignment = Alignment.Center
-        ) {
-            // 模拟视频画面 - 显示视频标题
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.alpha(0.4f)
+        // ========== 视频画面 ==========
+        if (hasError) {
+            // 播放失败：占位提示
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.PlayArrow,
-                    contentDescription = null,
-                    tint = Color.White.copy(alpha = 0.3f),
-                    modifier = Modifier.size(80.dp)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = video.title,
-                    color = Color.White.copy(alpha = 0.5f),
-                    fontSize = 18.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 32.dp)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "${video.resolution} · ${video.formattedSize}",
-                    color = Color.White.copy(alpha = 0.3f),
-                    fontSize = 13.sp
-                )
-            }
-
-            // 中央大播放/暂停按钮（暂停时显示）
-            AnimatedVisibility(
-                visible = !isPlaying || !showControls,
-                enter = fadeIn(),
-                exit = fadeOut()
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.85f))
-                        .clickable {
-                            isPlaying = !isPlaying
-                            showControls = true
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "暂停" else "播放",
-                        tint = VideoBackground,
-                        modifier = Modifier.size(36.dp)
+                        imageVector = Icons.Default.PlayArrow,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.3f),
+                        modifier = Modifier.size(80.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = video.title,
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontSize = 18.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "无法播放此视频",
+                        color = Color.White.copy(alpha = 0.3f),
+                        fontSize = 13.sp
                     )
                 }
+            }
+        } else {
+            AndroidView(
+                factory = { ctx ->
+                    TextureView(ctx).apply {
+                        surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                            override fun onSurfaceTextureAvailable(
+                                st: SurfaceTexture,
+                                width: Int,
+                                height: Int
+                            ) {
+                                currentSurface = Surface(st)
+                                surfaceReady = true
+                            }
+
+                            override fun onSurfaceTextureSizeChanged(
+                                st: SurfaceTexture,
+                                width: Int,
+                                height: Int
+                            ) {}
+
+                            override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
+                                currentSurface?.release()
+                                currentSurface = null
+                                surfaceReady = false
+                                return true
+                            }
+
+                            override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // 加载中指示
+            if (!isPrepared) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.3f),
+                            modifier = Modifier.size(80.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = video.title,
+                            color = Color.White.copy(alpha = 0.5f),
+                            fontSize = 18.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 32.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "${video.resolution} · ${video.formattedSize}",
+                            color = Color.White.copy(alpha = 0.3f),
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        // 中央大播放/暂停按钮（暂停或控件隐藏时显示）
+        AnimatedVisibility(
+            visible = (!isPlaying || !showControls) && !hasError,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.85f))
+                    .clickable {
+                        if (isPrepared) {
+                            if (isPlaying) {
+                                mediaPlayer.pause()
+                            } else {
+                                mediaPlayer.start()
+                            }
+                            isPlaying = !isPlaying
+                        }
+                        showControls = true
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (isPlaying) "暂停" else "播放",
+                    tint = VideoBackground,
+                    modifier = Modifier.size(36.dp)
+                )
             }
         }
 
@@ -304,8 +472,12 @@ fun VideoPlayerScreen(
                     )
                     Slider(
                         value = progress,
-                        onValueChange = {
-                            currentPositionMs = it * totalMs
+                        onValueChange = { newProgress ->
+                            val seekMs = (newProgress * totalMs).roundToLong().toInt()
+                            if (isPrepared) {
+                                mediaPlayer.seekTo(seekMs)
+                            }
+                            currentPositionMs = seekMs.toFloat()
                             showControls = true
                         },
                         modifier = Modifier
@@ -318,7 +490,11 @@ fun VideoPlayerScreen(
                         )
                     )
                     Text(
-                        text = video.formattedDuration,
+                        text = if (isPrepared && durationMs > 0) {
+                            formatTime(durationMs.roundToLong())
+                        } else {
+                            video.formattedDuration
+                        },
                         color = Color.White.copy(alpha = 0.8f),
                         fontSize = 12.sp,
                         modifier = Modifier.width(44.dp),
@@ -369,6 +545,10 @@ fun VideoPlayerScreen(
                                     },
                                     onClick = {
                                         playbackSpeed = speed
+                                        if (isPrepared) {
+                                            mediaPlayer.playbackParams =
+                                                PlaybackParams().setSpeed(speed)
+                                        }
                                         showSpeedMenu = false
                                     }
                                 )
@@ -379,7 +559,12 @@ fun VideoPlayerScreen(
                     // 后退10秒
                     IconButton(
                         onClick = {
-                            currentPositionMs = (currentPositionMs - 10_000f).coerceAtLeast(0f)
+                            if (isPrepared) {
+                                val newPos =
+                                    (mediaPlayer.currentPosition - 10_000).coerceAtLeast(0)
+                                mediaPlayer.seekTo(newPos)
+                                currentPositionMs = newPos.toFloat()
+                            }
                             showControls = true
                         },
                         modifier = Modifier.size(48.dp)
@@ -402,7 +587,14 @@ fun VideoPlayerScreen(
                     // 播放/暂停
                     IconButton(
                         onClick = {
-                            isPlaying = !isPlaying
+                            if (isPrepared) {
+                                if (isPlaying) {
+                                    mediaPlayer.pause()
+                                } else {
+                                    mediaPlayer.start()
+                                }
+                                isPlaying = !isPlaying
+                            }
                             showControls = true
                         },
                         modifier = Modifier
@@ -421,7 +613,12 @@ fun VideoPlayerScreen(
                     // 前进10秒
                     IconButton(
                         onClick = {
-                            currentPositionMs = (currentPositionMs + 10_000f).coerceAtMost(totalMs)
+                            if (isPrepared) {
+                                val newPos = (mediaPlayer.currentPosition + 10_000)
+                                    .coerceAtMost(totalMs.toInt())
+                                mediaPlayer.seekTo(newPos)
+                                currentPositionMs = newPos.toFloat()
+                            }
                             showControls = true
                         },
                         modifier = Modifier.size(48.dp)
@@ -455,7 +652,7 @@ fun VideoPlayerScreen(
                     }
                 }
 
-                // 模拟进度条（装饰性，仅显示缓冲状态）
+                // 缓冲进度指示（仅装饰）
                 LinearProgressIndicator(
                     progress = { 0.85f },
                     modifier = Modifier
