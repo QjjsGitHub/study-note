@@ -24,7 +24,6 @@ import com.example.study.fragment.notifications.NotificationsFragment;
 public class HomeFragment1 extends Fragment {
 
     private FragmentHome1Binding binding;
-    private HomeFragment1 homeFragment1;
 
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
@@ -32,7 +31,7 @@ public class HomeFragment1 extends Fragment {
         Log.d(BottomFragmentActivity.JAVA_FRAGMENT_AND_ACTIVITY_LIFE, getClass().getName().
                 substring(getClass().getName().lastIndexOf(".") + 1) + "  :  " +
                 "state" + "  :  " + "onCreateView" + "  Thread : "
-                + Thread.currentThread().getId());
+                + Thread.currentThread().getName());
 
         HomeViewModel homeViewModel =
                 new ViewModelProvider(this).get(HomeViewModel.class);
@@ -45,7 +44,6 @@ public class HomeFragment1 extends Fragment {
 
 
         Fragment tempFragment = new NotificationsFragment();
-        homeFragment1 = this;
         binding.textHome.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -113,7 +111,7 @@ public class HomeFragment1 extends Fragment {
         Log.d(BottomFragmentActivity.JAVA_FRAGMENT_AND_ACTIVITY_LIFE, getClass().getName().
                 substring(getClass().getName().lastIndexOf(".") + 1) + "  :  " + "state"
                 + "  :  " + "onStop" + "  Thread : "
-                + Thread.currentThread().getId());
+                + Thread.currentThread().getName());
         super.onStop();
     }
 

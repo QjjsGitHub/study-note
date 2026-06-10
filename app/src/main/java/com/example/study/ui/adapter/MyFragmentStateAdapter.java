@@ -23,12 +23,9 @@ public class MyFragmentStateAdapter extends FragmentStateAdapter {
 
     private String[] blankFragmentNames;
 
-    private FragmentManager mFragmentManager;
-
     public MyFragmentStateAdapter(FragmentManager fragmentManager, Lifecycle lifecycle, String[] blankFragmentNames) {
         super(fragmentManager, lifecycle);
         this.blankFragmentNames = blankFragmentNames;
-        mFragmentManager = fragmentManager;
     }
 
 

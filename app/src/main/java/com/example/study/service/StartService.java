@@ -25,7 +25,7 @@ public class StartService extends Service {
 
         @Override
         public String sayHi(String message) throws RemoteException {
-            Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :sayHi ");
+            Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getName() + "  state :sayHi ");
             return "hihi" + message;
         }
 
@@ -33,7 +33,7 @@ public class StartService extends Service {
         public void savePeople(Bundle bundle) throws RemoteException {
             bundle.setClassLoader(getClass().getClassLoader());
             People people = bundle.getParcelable("people");
-            Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :savePeople " + people.number + ":" + people.name);// Do more with the parcelable.
+            Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getName() + "  state :savePeople " + people.number + ":" + people.name);// Do more with the parcelable.
         }
 
 
@@ -44,31 +44,31 @@ public class StartService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :onStartCommand ");
+        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getName() + "  state :onStartCommand ");
         return super.onStartCommand(intent, flags, startId);
     }
 
     @Override
     public void onCreate() {
-        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :onCreate ");
+        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getName() + "  state :onCreate ");
         super.onCreate();
     }
 
     @Override
     public IBinder onBind(Intent intent) {
-        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :onBind ");
+        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getName() + "  state :onBind ");
         return myBinder;
     }
 
     @Override
     public boolean onUnbind(Intent intent) {
-        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :onUnbind ");
+        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getName() + "  state :onUnbind ");
         return super.onUnbind(intent);
     }
 
     @Override
     public void onDestroy() {
-        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :onDestroy ");
+        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getName() + "  state :onDestroy ");
         super.onDestroy();
     }
 }

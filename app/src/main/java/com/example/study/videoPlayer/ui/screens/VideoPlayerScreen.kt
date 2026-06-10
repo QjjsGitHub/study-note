@@ -8,12 +8,10 @@ import android.graphics.SurfaceTexture
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.PlaybackParams
-import android.net.Uri
 import android.util.Log
 
 import android.view.Surface
 import android.view.TextureView
-import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -53,7 +51,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -70,7 +67,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -190,7 +186,7 @@ fun VideoPlayerScreen(
                 currentPositionMs = mediaPlayer.currentPosition.toFloat()
             } catch (_: Exception) {
             }
-            delay(1000L)
+            delay(1000L.milliseconds)
         }
     }
 
@@ -730,10 +726,9 @@ fun VideoPlayerScreen(
                     // 全屏/旋转
                     IconButton(
                         onClick = {
-                            val activity = context as Activity
                             val isLandscape =
                                 context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-                            activity.requestedOrientation = if (isLandscape) {
+                            context.requestedOrientation = if (isLandscape) {
                                 ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                             } else {
                                 ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE

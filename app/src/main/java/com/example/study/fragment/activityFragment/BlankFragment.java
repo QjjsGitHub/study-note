@@ -116,7 +116,7 @@ public class BlankFragment extends Fragment {
 
     @Override
     public void onStart() {
-        Log.d(FRAGMENT_AND_ACTIVITY_LIFE, "blank  :  Thread: " + String.valueOf(Thread.currentThread().getId()));
+        Log.d(FRAGMENT_AND_ACTIVITY_LIFE, "blank  :  Thread: " + String.valueOf(Thread.currentThread().getName()));
         Log.d(FRAGMENT_AND_ACTIVITY_LIFE, getClass().getName().
                 substring(getClass().getName().lastIndexOf(".") + 1) + "  :  " + name + "  :  " + "onStart");
         super.onStart();

@@ -29,7 +29,7 @@ public class NotificationsFragment extends Fragment {
         Log.d(BottomFragmentActivity.JAVA_FRAGMENT_AND_ACTIVITY_LIFE, getClass().getName().
                 substring(getClass().getName().lastIndexOf(".") + 1) + "  :  " + "state"
                 + "  :  " + "onCreateView" + "  Thread : "
-                + Thread.currentThread().getId());
+                + Thread.currentThread().getName());
 
         NotificationsViewModel notificationsViewModel =
                 new ViewModelProvider(this).get(NotificationsViewModel.class);

@@ -17,13 +17,11 @@ import com.example.study.databinding.ActivityFragmentManagerBinding;
 
 public class FragmentManagerActivity extends AppCompatActivity {
 
-    private ActivityFragmentManagerBinding binding;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        binding = ActivityFragmentManagerBinding.inflate(getLayoutInflater());
+        ActivityFragmentManagerBinding binding = ActivityFragmentManagerBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
         getSupportFragmentManager().beginTransaction()

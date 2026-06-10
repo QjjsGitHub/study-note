@@ -62,7 +62,7 @@ public class DashboardFragment extends Fragment {
         Log.d(BottomFragmentActivity.JAVA_FRAGMENT_AND_ACTIVITY_LIFE, getClass().getName().
                 substring(getClass().getName().lastIndexOf(".") + 1) + "  :  " + "state"
                 + "  :  " + "onStop" + "  Thread : "
-                + Thread.currentThread().getId());
+                + Thread.currentThread().getName());
         super.onStop();
     }
 

@@ -172,7 +172,7 @@ public class FragmentActivity extends AppCompatActivity {
     protected void onStart() {
         super.onStart();
         Tools.getInstance().getTaskInfo(new WeakReference<>(this));
-        Log.d(FRAGMENT_AND_ACTIVITY_LIFE, "Thread: " + String.valueOf(Thread.currentThread().getId()));
+        Log.d(FRAGMENT_AND_ACTIVITY_LIFE, "Thread: " + String.valueOf(Thread.currentThread().getName()));
         Log.d(FRAGMENT_AND_ACTIVITY_LIFE, getClass().getName().substring(getClass().getName().lastIndexOf(".") + 1) + "onStart");
     }
 

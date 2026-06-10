@@ -267,7 +267,7 @@ public class MyThreadPool {
             @Override
             public String call() throws Exception {
                 Thread.sleep(1000);
-                Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  arrayBlockingQueueThreadPoolExecutor: call");
+                Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  arrayBlockingQueueThreadPoolExecutor: call");
                 return "callable : aaaaa";
             }
         });
@@ -280,17 +280,17 @@ public class MyThreadPool {
                 try {
                     //会造成当前线程阻塞
                     String a1 = a.get(1, TimeUnit.MINUTES);
-                    Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  Future: " + a1);
+                    Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  Future: " + a1);
                 } catch (InterruptedException e) {
-                    Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  InterruptedException ");
+                    Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  InterruptedException ");
                     //throw new RuntimeException(e);
                 } catch (TimeoutException e) {
                     //identical to 等同于
-                    Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  TimeoutException ");
+                    Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  TimeoutException ");
                 } catch (ExecutionException e) {
                     //identical to 等同于！
                     //饭！
-                    Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  ExecutionException ");
+                    Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  ExecutionException ");
                 }
             }
         });
@@ -302,23 +302,23 @@ public class MyThreadPool {
         Future<?> a = synchronousQueueThreadPoolExecutor.submit(new Runnable() {
             @Override
             public void run() {
-                Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  synchronousQueueThreadPoolExecutor: call ");
+                Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  synchronousQueueThreadPoolExecutor: call ");
             }
         });
 
         try {
             String a1 = (String) a.get(1, TimeUnit.MINUTES);
-            Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  Future: " + a1);
+            Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  Future: " + a1);
         } catch (InterruptedException e) {
-            Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  InterruptedException ");
+            Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  InterruptedException ");
             //throw new RuntimeException(e);
         } catch (TimeoutException e) {
             //identical to 等同于
-            Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  TimeoutException ");
+            Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  TimeoutException ");
         } catch (ExecutionException e) {
             //identical to 等同于！
             //饭！
-            Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  ExecutionException ");
+            Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  ExecutionException ");
         }
 
     }
@@ -327,24 +327,24 @@ public class MyThreadPool {
         Future<String> a = linkBlockBlockingQueueThreadPoolExecutor.submit(new Runnable() {
             @Override
             public void run() {
-                Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  testLinkedBlockingQueueThreadPoolExecutor:  run");
+                Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  testLinkedBlockingQueueThreadPoolExecutor:  run");
             }
         }, "testLinkedBlockingQueueThreadPoolExecutor");
 
 
         try {
             String a1 = (String) a.get(1, TimeUnit.MINUTES);
-            Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  Future: " + a1);
+            Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  Future: " + a1);
         } catch (InterruptedException e) {
-            Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  InterruptedException ");
+            Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  InterruptedException ");
             //throw new RuntimeException(e);
         } catch (TimeoutException e) {
             //identical to 等同于
-            Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  TimeoutException ");
+            Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  TimeoutException ");
         } catch (ExecutionException e) {
             //identical to 等同于！
             //饭！
-            Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  ExecutionException ");
+            Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  ExecutionException ");
         }
 
     }
@@ -354,7 +354,7 @@ public class MyThreadPool {
             @Override
             public void run() {
 
-                Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  testsPriorityBlockingQueueThreadPoolExecutor:run ");
+                Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  testsPriorityBlockingQueueThreadPoolExecutor:run ");
             }
         }).runnable);*/
 
@@ -366,7 +366,7 @@ public class MyThreadPool {
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
-                Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  testsPriorityBlockingQueueThreadPoolExecutor:run priority:  " + finalI);
+                Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  testsPriorityBlockingQueueThreadPoolExecutor:run priority:  " + finalI);
             }));
         }
 

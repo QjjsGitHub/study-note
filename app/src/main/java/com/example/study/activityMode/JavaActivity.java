@@ -69,9 +69,6 @@ public class JavaActivity extends AppCompatActivity implements View.OnClickListe
 
     private Handler handler;
 
-    private static Handler handler1;
-
-    private Thread thread;
     private ActivityJavaBinding binding;
 
     private ConfirmDialog showCancelDialog;
@@ -143,10 +140,10 @@ public class JavaActivity extends AppCompatActivity implements View.OnClickListe
 
         handler.dispatchMessage(handler.obtainMessage());
 
-        thread = new MyThread(new WeakReference<Activity>(this));
+        Thread thread = new MyThread(new WeakReference<Activity>(this));
         thread.start();
 
-        Log.e(JAVA_ACTIVITY_THREAD, Thread.currentThread().getId() + "主线程loop" + Thread.currentThread().getName());
+        Log.e(JAVA_ACTIVITY_THREAD, Thread.currentThread().getName() + "主线程loop" + Thread.currentThread().getName());
 
         //thread.interrupt();
 
@@ -304,14 +301,14 @@ public class JavaActivity extends AppCompatActivity implements View.OnClickListe
         public void run() {
             Looper.prepare();
 
-            handler1 = new Handler(Objects.requireNonNull(Looper.myLooper()));
+            Handler handler1 = new Handler(Objects.requireNonNull(Looper.myLooper()));
             handler1.postDelayed(new Runnable() {
                 @Override
                 public void run() {
                     if (Thread.interrupted()) {
                         return;
                     }
-                    Log.e(JAVA_ACTIVITY_THREAD, Thread.currentThread().getId() + ":子线程loop:" + Thread.currentThread().getName());
+                    Log.e(JAVA_ACTIVITY_THREAD, Thread.currentThread().getName() + ":子线程loop:" + Thread.currentThread().getName());
 
                     if (weakReferenceActivity.get() != null) {
                         Toast.makeText(weakReferenceActivity.get().getApplicationContext(), ":子线程loop:", Toast.LENGTH_SHORT).show();

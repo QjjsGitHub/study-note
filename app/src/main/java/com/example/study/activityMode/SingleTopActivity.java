@@ -25,13 +25,11 @@ import java.util.List;
 
 public class SingleTopActivity extends AppCompatActivity implements View.OnClickListener {
 
-    private ActivitySingleTopBinding binding;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
-        binding = ActivitySingleTopBinding.inflate(getLayoutInflater());
+        ActivitySingleTopBinding binding = ActivitySingleTopBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.main, new OnApplyWindowInsetsListener() {

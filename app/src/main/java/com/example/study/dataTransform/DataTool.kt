@@ -41,61 +41,6 @@ class DataTool private constructor(private val contextWeakReference: WeakReferen
         return@withContext imageList.toTypedArray()
     }
 
-    suspend fun getImages(): String {
-
-        val context = contextWeakReference.get() ?: return "null"
-
-        val mImageUri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-
-        // 只查询jpeg和png的图片
-        val cursor: Cursor? = context.contentResolver.query(
-            mImageUri, null,
-            (MediaStore.Images.Media.MIME_TYPE + "=? or "
-                    + MediaStore.Images.Media.MIME_TYPE + "=?"),
-            arrayOf<String>("image/jpeg", "image/png"),
-            MediaStore.Images.Media.DATE_MODIFIED
-        )
-
-        cursor?.use {
-            while (it.moveToNext()) {
-
-
-                //获取数据库中图片路径：/storage/emulated/0/DCIM/Camera/IMG20160501152640.jpg
-                val path = cursor.getString(cursor.getColumnIndex(MediaStore.Images.Media.DATA))
-
-                //获取父目录：/storage/emulated/0/DCIM/Camera
-                val parentFile = File(path).getParentFile()
-
-                //没有父目录，跳出本次循环
-                if (parentFile == null) continue
-
-
-                //父目录的绝对路径：/storage/emulated/0/DCIM/Camera
-
-                val dirPath = parentFile.getAbsolutePath()
-
-
-                if (parentFile.list() != null) {
-                    //根据父文件夹，过滤出所有以jpg,png,jpeg结尾的文件的数量
-                    val imgCount = parentFile.list(object : FilenameFilter {
-                        override fun accept(dir: File?, name: String): Boolean {
-                            return name.endsWith(".jpg") || name.endsWith(".png")
-                                    || name.endsWith(".jpeg")
-                        }
-                    }).size
-
-
-                }
-
-            }
-        }
-
-        cursor?.close()
-
-        return ""
-
-    }
-
     suspend fun sharePreferencesTest(): Pair<Int, String> {
 
         val context = contextWeakReference.get() ?: return 0 to "null"

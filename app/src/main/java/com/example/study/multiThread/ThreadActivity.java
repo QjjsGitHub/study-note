@@ -121,9 +121,9 @@ public class ThreadActivity extends AppCompatActivity {
                     }
                 });
 
-                Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  secondThread: start ");
+                Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  secondThread: start ");
                 Thread.sleep(3000);
-                Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  secondThread: stop ");
+                Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  secondThread: stop ");
 
                 return "secondThread result";
             }
@@ -134,7 +134,7 @@ public class ThreadActivity extends AppCompatActivity {
 
 
         try {
-            Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  secondThread: " + futureTask.get());
+            Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  secondThread: " + futureTask.get());
         } catch (ExecutionException | InterruptedException e) {
             //ThreadActivityTestthrow new RuntimeException(e);
         }
@@ -150,13 +150,13 @@ public class ThreadActivity extends AppCompatActivity {
                     }
                 });
 
-                Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  thirdThread: start ");
+                Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  thirdThread: start ");
                 try {
                     Thread.sleep(3000);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
-                Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  thirdThread: stop ");
+                Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  thirdThread: stop ");
 
             }
         }, "thirdThread result"));
@@ -166,7 +166,7 @@ public class ThreadActivity extends AppCompatActivity {
 
 
         try {
-            Log.d(TAG, "Thread: " + Thread.currentThread().getId() + "  thirdThread: " + futureTask1.get());
+            Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  thirdThread: " + futureTask1.get());
         } catch (ExecutionException e) {
             throw new RuntimeException(e);
         } catch (InterruptedException e) {

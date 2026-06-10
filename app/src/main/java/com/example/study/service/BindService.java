@@ -33,7 +33,7 @@ public class BindService extends Service {
 
     @Override
     public void onCreate() {
-        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :onCreate ");
+        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getName() + "  state :onCreate ");
         super.onCreate();
 
         setForegroundService();
@@ -53,7 +53,7 @@ public class BindService extends Service {
 
                     //getTopActivityPackageName(getApplicationContext());
 
-                    Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :count++ " + count);
+                    Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getName() + "  state :count++ " + count);
                 }
             }
         }).start();
@@ -89,32 +89,32 @@ public class BindService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :onBind ");
+        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getName() + "  state :onBind ");
         return mBinder;
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :onStartCommand ");
+        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getName() + "  state :onStartCommand ");
         return super.onStartCommand(intent, flags, startId);
     }
 
     @Override
     public boolean onUnbind(Intent intent) {
-        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :onUnbind ");
+        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getName() + "  state :onUnbind ");
         return super.onUnbind(intent);
     }
 
     @Override
     public void onRebind(Intent intent) {
-        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :onRebind ");
+        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getName() + "  state :onRebind ");
         super.onRebind(intent);
     }
 
     @Override
     public void onDestroy() {
         quit = false;
-        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() + "  state :onDestroy ");
+        Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getName() + "  state :onDestroy ");
         super.onDestroy();
     }
 
@@ -178,7 +178,7 @@ public class BindService extends Service {
         }
 
         public void getCount() {
-            Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getId() +
+            Log.d(ServiceActivity.TAG, "Thread:" + Thread.currentThread().getName() +
                     "  执行service_bind_get_count: " + bindService.getCount());
         }
 

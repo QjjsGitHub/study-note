@@ -24,13 +24,11 @@ import java.util.List;
 
 public class SingleInstanceActivity extends AppCompatActivity implements View.OnClickListener {
 
-    private ActivitySingleInstanceBinding binding;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        binding = ActivitySingleInstanceBinding.inflate(getLayoutInflater());
+        ActivitySingleInstanceBinding binding = ActivitySingleInstanceBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.main, new OnApplyWindowInsetsListener() {
