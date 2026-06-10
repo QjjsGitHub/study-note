@@ -25,12 +25,17 @@ class VideoThumbnailFetcher(
     private val resolver: ContentResolver,
     private val uri: Uri,
     private val resources: android.content.res.Resources,
+    private val options: Options,
 ) : Fetcher {
 
     override suspend fun fetch(): FetchResult = withContext(Dispatchers.IO) {
         val bitmap: Bitmap? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val size = options.size
+            val width = size.width.pxOrElse { 512 }
+            val height = size.height.pxOrElse { 288 }
+            
             try {
-                resolver.loadThumbnail(uri, Size(512, 288), null)
+                resolver.loadThumbnail(uri, Size(width, height), null)
             } catch (_: Exception) {
                 null
             }
@@ -73,7 +78,12 @@ class VideoThumbnailFetcher(
             imageLoader: ImageLoader,
         ): Fetcher? {
             if (data.scheme != "content") return null
-            return VideoThumbnailFetcher(context.contentResolver, data, context.resources)
+            return VideoThumbnailFetcher(context.contentResolver, data, context.resources, options)
         }
     }
+}
+
+/** 辅助扩展：将 Coil 的 Dimension 转为像素值，如果是 Original 则使用默认值 */
+private inline fun coil.size.Dimension.pxOrElse(block: () -> Int): Int {
+    return if (this is coil.size.Dimension.Pixels) this.px else block()
 }

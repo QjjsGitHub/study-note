@@ -204,7 +204,11 @@ fun VideoListScreen(
                 // 头部统计信息
                 item(span = { GridItemSpan(2) }) { StorageInfoHeader(viewModel.videoList) }
                 // 视频列表
-                items(viewModel.videoList, key = { it.id }) { video ->
+                items(
+                    items = viewModel.videoList,
+                    key = { it.id },
+                    contentType = { "video_card" } // 添加 contentType 提升复用效率
+                ) { video ->
                     VideoCard(video = video, onClick = { onVideoClick(video) })
                 }
                 // 底部间距
@@ -265,14 +269,14 @@ private fun VideoCard(video: VideoItem, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .height(150.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(CardBg, shape = CardShape)
+            .clip(CardShape)
+            .background(CardBg)
             .clickable(onClick = onClick)
     ) {
         // 缩略图
         ThumbnailPlaceholder(video)
 
-        // 固定高度文本区 — 避免每次滚动进入视野时测量文字
+        // 标题：强制单行，确保副标题不被挤占
         Text(
             text = video.title,
             style = MaterialTheme.typography.bodyMedium,
@@ -280,18 +284,19 @@ private fun VideoCard(video: VideoItem, onClick: () -> Unit) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             fontWeight = FontWeight.Medium,
-            lineHeight = 18.sp,
             modifier = Modifier
-                .padding(start = 8.dp, top = 6.dp)
+                .padding(start = 8.dp, top = 6.dp, end = 8.dp)
                 .height(24.dp)
         )
+        // 副标题：使用预计算的字符串
         Text(
-            text = video.resolution + " · " + video.formattedSize,
+            text = video.displaySubtitle,
             style = MaterialTheme.typography.labelSmall,
             color = VideoOnSurfaceVariant,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier
-                .padding(start = 10.dp)
+                .padding(start = 10.dp, end = 8.dp)
                 .height(16.dp)
         )
     }
@@ -301,6 +306,18 @@ private fun VideoCard(video: VideoItem, onClick: () -> Unit) {
 
 @Composable
 private fun ThumbnailPlaceholder(video: VideoItem) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    
+    // 优化：显式指定 ImageRequest 的 size 和 precision，提升滑动时的响应速度
+    val request = remember(video.thumbnailPath) {
+        coil.request.ImageRequest.Builder(context)
+            .data(video.thumbnailPath)
+            .crossfade(true)
+            .size(400, 300) // 根据 2 列网格的实际宽度估算
+            .precision(coil.size.Precision.INEXACT) // 允许非精确匹配以提高加载速度
+            .build()
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -310,27 +327,24 @@ private fun ThumbnailPlaceholder(video: VideoItem) {
     ) {
         // Coil AsyncImage — 自动缓存、取消、线程管理
         AsyncImage(
-            model = video.thumbnailPath,
+            model = request,
             contentDescription = video.title,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
         )
 
-        // 时长标签（右下角）
-        Box(
+        // 时长标签（右下角）：直接在 Text 上应用背景和对齐，减少一个 Box 层级
+        Text(
+            text = video.formattedDuration,
+            color = Color.White,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(6.dp)
                 .background(VideoControlBg, shape = BadgeShape)
-                .padding(horizontal = 5.dp, vertical = 0.dp)
-        ) {
-            Text(
-                text = video.formattedDuration,
-                color = Color.White,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-            )
-        }
+                .padding(horizontal = 5.dp, vertical = 1.dp) // 内部留白
+        )
     }
 }

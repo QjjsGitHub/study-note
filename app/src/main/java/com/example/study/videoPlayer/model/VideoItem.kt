@@ -38,5 +38,8 @@ data class VideoItem(
             else -> "%.0f KB".format(kb)
         }
     }
+
+    /** 预计算副标题（分辨率 + 大小），减少 Composable 中的字符串拼接 */
+    val displaySubtitle: String = "$resolution · $formattedSize"
 }
 
