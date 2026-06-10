@@ -15,6 +15,8 @@ import coil.fetch.Fetcher
 import coil.fetch.FetchResult
 import coil.request.Options
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.IOException
 
@@ -28,24 +30,35 @@ class VideoThumbnailFetcher(
     private val options: Options,
 ) : Fetcher {
 
+    companion object {
+        /** 
+         * 限制全局并发缩略图生成的数量。
+         * 设置为 3 可以确保不会在滑动时瞬间压死磁盘 IO 和解码器。
+         */
+        private val semaphore = Semaphore(1)
+    }
+
     override suspend fun fetch(): FetchResult = withContext(Dispatchers.IO) {
-        val bitmap: Bitmap? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val size = options.size
-            val width = size.width.pxOrElse { 512 }
-            val height = size.height.pxOrElse { 288 }
-            
-            try {
-                resolver.loadThumbnail(uri, Size(width, height), null)
-            } catch (_: Exception) {
-                null
+        // 使用信号量控制并发，实现“一个一个（或少量并行）”加载
+        val bitmap: Bitmap? = semaphore.withPermit {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val size = options.size
+                val width = size.width.pxOrElse { 512 }
+                val height = size.height.pxOrElse { 288 }
+                
+                try {
+                    resolver.loadThumbnail(uri, Size(width, height), null)
+                } catch (_: Exception) {
+                    null
+                }
+            } else {
+                // Android Q 以下的兼容处理
+                @Suppress("DEPRECATION")
+                android.media.ThumbnailUtils.createVideoThumbnail(
+                    getPathFromUri(uri) ?: "",
+                    MediaStore.Video.Thumbnails.MINI_KIND
+                )
             }
-        } else {
-            // Android Q 以下的兼容处理
-            @Suppress("DEPRECATION")
-            android.media.ThumbnailUtils.createVideoThumbnail(
-                getPathFromUri(uri) ?: "",
-                MediaStore.Video.Thumbnails.MINI_KIND
-            )
         }
 
         bitmap ?: throw IOException("Could not load thumbnail for $uri")
