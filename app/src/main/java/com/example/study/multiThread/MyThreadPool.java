@@ -268,7 +268,7 @@ public class MyThreadPool {
             public String call() throws Exception {
                 Thread.sleep(1000);
                 Log.d(TAG, "Thread: " + Thread.currentThread().getName() + "  arrayBlockingQueueThreadPoolExecutor: call");
-                return "callable : aaaaa";
+                return "callable : 测试";
             }
         });
 

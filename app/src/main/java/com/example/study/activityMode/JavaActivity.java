@@ -1,12 +1,8 @@
 package com.example.study.activityMode;
 
-import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
-
 import com.example.study.internet.FirstFragment.User;
 
 import android.app.Activity;
-import android.app.ActivityManager;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
@@ -39,7 +35,6 @@ import androidx.lifecycle.ViewModelProvider;
 import com.example.study.R;
 import com.example.study.Tools;
 import com.example.study.databinding.ActivityJavaBinding;
-import com.example.study.internet.FirstFragment;
 import com.example.study.internet.InternetActivity;
 import com.example.study.ui.study.ConfirmDialog;
 import com.example.study.ui.study.MyViewModel;
@@ -215,7 +210,7 @@ public class JavaActivity extends AppCompatActivity implements View.OnClickListe
     public void showCancelDialog(String reportOrderNo, String storeCode) {
         if (showCancelDialog == null) {
             showCancelDialog = new ConfirmDialog(new WeakReference<Context>(this), "取消提醒", "取消后将不再对已添加的内容进行保存", "暂不取消", "确认取消");
-            showCancelDialog.setOnViewClickLiatener(new ConfirmDialog.OnViewClickLiatener() {
+            showCancelDialog.setOnViewClickListener(new ConfirmDialog.OnViewClickListener() {
                 @Override
                 public void sureClick() {
                     if (TextUtils.isEmpty(reportOrderNo)) {

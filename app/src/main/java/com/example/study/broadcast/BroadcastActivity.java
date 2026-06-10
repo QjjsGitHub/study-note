@@ -143,7 +143,7 @@ public class BroadcastActivity extends AppCompatActivity {
             public void onClick(View v) {
                 Intent intent = new Intent();
                 intent.setAction("com.example.study.broadcast.MY_LOCAL_BROADCAST");
-                intent.putExtra("name", "qqyumidi");
+                intent.putExtra("name", "广播内容");
                 //发送应用内广播
                 localBroadcastManager.sendBroadcast(intent);
             }

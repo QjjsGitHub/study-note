@@ -258,7 +258,7 @@ class NormalActivity : AppCompatActivity() {
         var intent1: Intent = intent
         var bundle: Bundle? = intent1.getBundleExtra("test")
 
-        Log.d("NormalActivity", "NormalActivityage" + (bundle?.getInt("age") ?: ""))
+        Log.d("NormalActivity", "NormalActivityAge" + (bundle?.getInt("age") ?: ""))
 
         /*
         运算符
@@ -558,7 +558,7 @@ class NormalActivity : AppCompatActivity() {
                             )
                         )
                     ) {
-                        append("你aaaaaa\n")
+                        append("拼接\n")
                     }
                 }
             },

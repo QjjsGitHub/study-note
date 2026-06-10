@@ -24,15 +24,15 @@ public class ConfirmDialog extends Dialog {
     private TextView tvSure;
     private String title, content, cancelString, sureString;
 
-    public interface OnViewClickLiatener {
+    public interface OnViewClickListener {
         void sureClick();
 
         void cancelClick();
     }
 
-    public OnViewClickLiatener onViewClickLiatener;
+    public OnViewClickListener onViewClickLiatener;
 
-    public void setOnViewClickLiatener(OnViewClickLiatener onViewClickLiatener) {
+    public void setOnViewClickListener(OnViewClickListener onViewClickLiatener) {
         this.onViewClickLiatener = onViewClickLiatener;
     }
 
