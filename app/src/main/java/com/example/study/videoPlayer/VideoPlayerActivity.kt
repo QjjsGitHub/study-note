@@ -13,42 +13,38 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import com.example.study.videoPlayer.model.VideoItem
 import com.example.study.videoPlayer.ui.screens.VideoListScreen
 import com.example.study.videoPlayer.ui.screens.VideoPlayerScreen
 import com.example.study.videoPlayer.ui.theme.VideoPlayerTheme
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import com.example.study.videoPlayer.viewmodel.VideoListViewModel
 
 class VideoPlayerActivity : ComponentActivity() {
 
-    /** 扫描到的本地视频列表，初始为空避免 mock 数据闪烁 */
-    private var videoList by mutableStateOf<List<VideoItem>>(emptyList())
-
-    /** 是否正在扫描 */
-    private var isScanning by mutableStateOf(false)
-
-    /** 是否已完成首次扫描 */
-    private var hasScanned by mutableStateOf(false)
+    /** 权限授予后递增，通知 composable 触发扫描 */
+    private var permissionGrantedTrigger by mutableIntStateOf(0)
 
     /** 权限请求启动器 */
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) {
-                scanLocalVideos()
+                permissionGrantedTrigger++
             } else {
                 Toast.makeText(this, "需要读取权限才能扫描本地视频", Toast.LENGTH_SHORT).show()
             }
@@ -66,32 +62,85 @@ class VideoPlayerActivity : ComponentActivity() {
                 .build()
         )
 
-        // 自动尝试扫描
-        checkPermissionAndScan()
-
         setContent {
             VideoPlayerTheme {
+
+                val listViewModel: VideoListViewModel by viewModels()
+
                 var currentVideo by remember { mutableStateOf<VideoItem?>(null) }
 
-                // 稳定回调引用，避免每次重组重建 lambda 导致子组件重组
+                // ── 观察 ViewModel 一次性事件 ──────────────────────
+                LaunchedEffect(Unit) {
+                    listViewModel.events.collect { event ->
+                        when (event) {
+                            is VideoListViewModel.ScanEvent.Success -> {
+                                val count = event.count
+                                val msg =
+                                    if (count > 0) "已找到 $count 个本地视频" else "未找到本地视频文件"
+                                Toast.makeText(this@VideoPlayerActivity, msg, Toast.LENGTH_SHORT)
+                                    .show()
+                            }
+
+                            is VideoListViewModel.ScanEvent.Error -> {
+                                Toast.makeText(
+                                    this@VideoPlayerActivity,
+                                    "扫描失败: ${event.message}",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    }
+                }
+
+                // ── 首次进入自动扫描（权限已授予时） ──────────────
+                LaunchedEffect(Unit) {
+                    val permission = getStoragePermission()
+                    if (ContextCompat.checkSelfPermission(
+                            this@VideoPlayerActivity, permission
+                        ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        listViewModel.scanVideos()
+                    } else {
+                        requestPermissionLauncher.launch(permission)
+                    }
+                }
+
+                // ── 用户授予权限后触发扫描 ────────────────────────
+                LaunchedEffect(permissionGrantedTrigger) {
+                    if (permissionGrantedTrigger > 0) {
+                        listViewModel.scanVideos()
+                    }
+                }
+
+                // 稳定回调引用
                 val onBack = remember {
                     {
                         currentVideo = null
                         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                     }
                 }
-                val onRefresh = remember { { checkPermissionAndScan() } }
-                val onScan = remember { { checkPermissionAndScan() } }
+                val onRefresh = remember { { listViewModel.scanVideos() } }
+                val onScan = remember {
+                    {
+                        val permission = getStoragePermission()
+                        if (ContextCompat.checkSelfPermission(
+                                this@VideoPlayerActivity, permission
+                            ) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            listViewModel.scanVideos()
+                        } else {
+                            requestPermissionLauncher.launch(permission)
+                        }
+                    }
+                }
 
                 AnimatedContent(
                     targetState = currentVideo,
                     transitionSpec = {
                         if (targetState != null) {
-                            // 进入播放器：从右侧滑入
                             (slideInHorizontally { it } + fadeIn()) togetherWith
                                     (slideOutHorizontally { -it / 3 } + fadeOut())
                         } else {
-                            // 返回列表：从左侧滑入
                             (slideInHorizontally { -it } + fadeIn()) togetherWith
                                     (slideOutHorizontally { it / 3 } + fadeOut())
                         }
@@ -99,7 +148,6 @@ class VideoPlayerActivity : ComponentActivity() {
                     label = "video_navigation"
                 ) { video ->
                     if (video != null) {
-                        // 系统返回键 → 回到列表（同时恢复竖屏）
                         BackHandler(onBack = onBack)
 
                         VideoPlayerScreen(
@@ -108,8 +156,7 @@ class VideoPlayerActivity : ComponentActivity() {
                         )
                     } else {
                         VideoListScreen(
-                            videos = videoList,
-                            isScanning = isScanning,
+                            viewModel = listViewModel,
                             onVideoClick = { currentVideo = it },
                             onRefresh = onRefresh,
                             onScan = onScan
@@ -120,68 +167,11 @@ class VideoPlayerActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * 检查权限并根据结果决定是否扫描
-     * - Android 13+ (API 33): 需要 READ_MEDIA_VIDEO
-     * - 低于 Android 13: 需要 READ_EXTERNAL_STORAGE
-     */
-    private fun checkPermissionAndScan() {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    private fun getStoragePermission(): String {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Manifest.permission.READ_MEDIA_VIDEO
         } else {
             Manifest.permission.READ_EXTERNAL_STORAGE
-        }
-
-        if (ContextCompat.checkSelfPermission(this, permission)
-            == PackageManager.PERMISSION_GRANTED
-        ) {
-            // 已有权限，直接扫描
-            scanLocalVideos()
-        } else {
-            // 申请权限
-            requestPermissionLauncher.launch(permission)
-        }
-    }
-
-    /**
-     * 在 IO 线程扫描本地视频，不阻塞 UI
-     */
-    private fun scanLocalVideos() {
-        if (isScanning) return
-        isScanning = true
-
-        lifecycleScope.launch {
-            try {
-                val videos = withContext(Dispatchers.IO) {
-                    VideoScanner.scanAllVideos(contentResolver)
-                }
-
-                videoList = videos
-                hasScanned = true
-
-                val count = videos.size
-                if (count > 0) {
-                    Toast.makeText(
-                        this@VideoPlayerActivity,
-                        "已找到 $count 个本地视频",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                } else {
-                    Toast.makeText(
-                        this@VideoPlayerActivity,
-                        "未找到本地视频文件",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            } catch (e: Exception) {
-                Toast.makeText(
-                    this@VideoPlayerActivity,
-                    "扫描失败: ${e.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
-            } finally {
-                isScanning = false
-            }
         }
     }
 }

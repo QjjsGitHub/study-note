@@ -6,12 +6,10 @@ import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.SurfaceTexture
 import android.media.AudioManager
-import android.media.MediaPlayer
-import android.media.PlaybackParams
 import android.util.Log
-
 import android.view.Surface
 import android.view.TextureView
+import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -61,7 +59,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -79,15 +76,18 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.example.study.videoPlayer.model.VideoItem
 import com.example.study.videoPlayer.ui.theme.VideoBackground
 import com.example.study.videoPlayer.ui.theme.VideoControlBg
 import com.example.study.videoPlayer.ui.theme.VideoPrimary
+import com.example.study.videoPlayer.viewmodel.VideoPlayerViewModel
 import kotlinx.coroutines.delay
 import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
-import androidx.core.net.toUri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,20 +97,11 @@ fun VideoPlayerScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val viewModelStore: ViewModelStoreOwner =
+        LocalViewModelStoreOwner.current ?: return
 
-    var isPlaying by remember { mutableStateOf(false) }
-    var currentPositionMs by remember { mutableFloatStateOf(0f) }
-    var showControls by remember { mutableStateOf(true) }
-    var showSpeedMenu by remember { mutableStateOf(false) }
-    var playbackSpeed by remember { mutableFloatStateOf(1.0f) }
-    var showVolumeOverlay by remember { mutableStateOf(false) }
-    var showBrightnessOverlay by remember { mutableStateOf(false) }
-
-    var isPrepared by remember { mutableStateOf(false) }
-    var hasError by remember { mutableStateOf(false) }
-
-    var surfaceReady by remember { mutableStateOf(false) }
-    var currentSurface by remember { mutableStateOf<Surface?>(null) }
+    val viewModel: VideoPlayerViewModel =
+        ViewModelProvider(viewModelStore)[VideoPlayerViewModel::class]
 
     // ─── 从系统读取初始亮度与音量 ───
     val activity = context as Activity
@@ -119,93 +110,52 @@ fun VideoPlayerScreen(
 
     val originalBrightness = remember { activity.window.attributes.screenBrightness }
 
-    var brightness by remember {
-        val cur = activity.window.attributes.screenBrightness
-        mutableFloatStateOf(if (cur < 0f) 0.5f else cur.coerceIn(0.01f, 1f))
+    // 初始化 ViewModel 的亮度/音量（仅首次）
+    LaunchedEffect(Unit) {
+        val curBrightness = activity.window.attributes.screenBrightness
+        viewModel.updateBrightness(
+            if (curBrightness < 0f) 0.5f else curBrightness.coerceIn(
+                0.01f,
+                1f
+            )
+        )
+        val curVolume =
+            audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / maxVolume
+        viewModel.updateVolume(curVolume)
     }
-    var volume by remember {
-        val cur = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / maxVolume
-        mutableFloatStateOf(cur)
+
+    // ── 同步 ViewModel 亮度 → 系统窗口 ──────────────────────────
+    LaunchedEffect(viewModel.brightness) {
+        val lp = activity.window.attributes
+        lp.screenBrightness = viewModel.brightness
+        activity.window.attributes = lp
     }
 
-    // 拖拽起始值（避免快速滑动时值跳变）
-    var dragStartBrightness by remember { mutableFloatStateOf(0f) }
-    var dragStartVolume by remember { mutableFloatStateOf(0f) }
+    // ── 同步 ViewModel 音量 → AudioManager ─────────────────────
+    LaunchedEffect(viewModel.volume) {
+        val streamVol = (viewModel.volume * maxVolume).toInt()
+        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, streamVol, 0)
+    }
 
-    // 创建 MediaPlayer 实例
-    val mediaPlayer = remember { MediaPlayer() }
-
-    // ========== 准备播放器 ==========
-    LaunchedEffect(surfaceReady, video) {
-        if (!surfaceReady) return@LaunchedEffect
-
-        try {
-            mediaPlayer.reset()
-            isPrepared = false
-            hasError = false
-
-            // 优先使用 content URI，其次用文件路径
-            val contentUri = video.thumbnailPath?.toUri()
-            if (contentUri != null && contentUri.scheme == "content") {
-                mediaPlayer.setDataSource(context, contentUri)
-            } else {
-                mediaPlayer.setDataSource(video.filePath)
-            }
-
-            mediaPlayer.setSurface(currentSurface)
-            mediaPlayer.prepareAsync()
-
-            mediaPlayer.setOnPreparedListener { mp ->
-                isPrepared = true
-                mp.start()
-                isPlaying = true
-                if (playbackSpeed != 1.0f) {
-                    mp.playbackParams = PlaybackParams().setSpeed(playbackSpeed)
-                }
-            }
-
-            mediaPlayer.setOnErrorListener { _, _, _ ->
-                hasError = true
-                isPrepared = false
-                true
-            }
-
-            mediaPlayer.setOnCompletionListener {
-                isPlaying = false
-                currentPositionMs = video.durationMs.toFloat()
-            }
-        } catch (_: Exception) {
-            hasError = true
+    // ── 自动隐藏亮度 / 音量覆盖层 ──────────────────────────────
+    LaunchedEffect(viewModel.showBrightnessOverlay) {
+        if (viewModel.showBrightnessOverlay) {
+            delay(1500L.milliseconds)
+            viewModel.showBrightnessOverlay = false
+        }
+    }
+    LaunchedEffect(viewModel.showVolumeOverlay) {
+        if (viewModel.showVolumeOverlay) {
+            delay(1500L.milliseconds)
+            viewModel.showVolumeOverlay = false
         }
     }
 
-    // ========== 轮询播放进度 ==========
-    LaunchedEffect(isPlaying, isPrepared) {
-        while (isPlaying && isPrepared) {
-            try {
-                currentPositionMs = mediaPlayer.currentPosition.toFloat()
-            } catch (_: Exception) {
-            }
-            delay(1000L.milliseconds)
-        }
-    }
-
-    // ========== 生命周期处理 ==========
+    // ── 生命周期处理 ──────────────────────────────────────────
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_PAUSE -> {
-                    if (isPlaying) {
-                        mediaPlayer.pause()
-                        isPlaying = false
-                    }
-                }
-
-                Lifecycle.Event.ON_DESTROY -> {
-                    mediaPlayer.release()
-                }
-
-                else -> {}
+            if (event == Lifecycle.Event.ON_PAUSE) {
+                viewModel.onPause()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -214,14 +164,9 @@ fun VideoPlayerScreen(
         }
     }
 
-    // ========== 组件销毁时释放资源 / 恢复原始亮度 ==========
+    // ── 组件销毁时恢复原始亮度 ──────────────────────────────────
     DisposableEffect(Unit) {
         onDispose {
-            try {
-                mediaPlayer.release()
-            } catch (_: Exception) {
-            }
-            // 恢复窗口原始亮度
             try {
                 val lp = activity.window.attributes
                 lp.screenBrightness = originalBrightness
@@ -231,27 +176,9 @@ fun VideoPlayerScreen(
         }
     }
 
-    // 自动隐藏控件
-    LaunchedEffect(showControls) {
-        if (showControls && isPlaying) {
-            delay(4000L.milliseconds)
-            showControls = false
-        }
-    }
-
-    // 自动隐藏亮度 / 音量覆盖层
-    LaunchedEffect(showBrightnessOverlay) {
-        if (showBrightnessOverlay) {
-            delay(1500L.milliseconds)
-            showBrightnessOverlay = false
-        }
-    }
-    LaunchedEffect(showVolumeOverlay) {
-        if (showVolumeOverlay) {
-            delay(1500L.milliseconds)
-            showVolumeOverlay = false
-        }
-    }
+    // 拖拽手势的临时状态（仅手势期间使用，不放入 ViewModel）
+    var dragStartBrightness by remember { mutableFloatStateOf(0f) }
+    var dragStartVolume by remember { mutableFloatStateOf(0f) }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -259,11 +186,11 @@ fun VideoPlayerScreen(
             .background(VideoBackground)
             .pointerInput(Unit) {
                 var lastUpdateMs = 0L
-                var accumulatedDrag = 0f   // 累加每帧拖拽量
+                var accumulatedDrag = 0f
                 detectVerticalDragGestures(
                     onDragStart = { _ ->
-                        dragStartBrightness = brightness
-                        dragStartVolume = volume
+                        dragStartBrightness = viewModel.brightness
+                        dragStartVolume = viewModel.volume
                         accumulatedDrag = 0f
                     },
                     onVerticalDrag = { change, dragAmount ->
@@ -286,43 +213,32 @@ fun VideoPlayerScreen(
                                 // 左侧 — 亮度
                                 dragStartBrightness =
                                     (dragStartBrightness + fraction).coerceIn(0.01f, 1f)
-
-                                brightness = dragStartBrightness
-                                showBrightnessOverlay = true
-                                val lp = activity.window.attributes
-                                lp.screenBrightness = brightness
-                                activity.window.attributes = lp
+                                viewModel.updateBrightness(dragStartBrightness)
+                                viewModel.showBrightnessOverlay = true
                             } else {
                                 // 右侧 — 音量
                                 dragStartVolume = (dragStartVolume + fraction).coerceIn(0f, 1f)
-
-                                volume = dragStartVolume
-                                showVolumeOverlay = true
-                                val streamVol = (dragStartVolume * maxVolume).toInt()
-                                audioManager.setStreamVolume(
-                                    AudioManager.STREAM_MUSIC, streamVol, 0
-                                )
+                                viewModel.updateVolume(dragStartVolume)
+                                viewModel.showVolumeOverlay = true
                             }
                         }
                     },
-                    onDragEnd = { /* 覆盖层通过 LaunchedEffect 自动消失 */ },
+                    onDragEnd = {},
                     onDragCancel = {}
                 )
             }
             .clickable(
                 indication = null,
                 interactionSource = remember { MutableInteractionSource() }
-            ) { showControls = !showControls }
-    )
-    {
+            ) { viewModel.toggleControls() }
+    ) {
         // ========== 视频画面 ==========
-        if (hasError) {
+        if (viewModel.hasError) {
             // 播放失败：占位提示
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
-            )
-            {
+            ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
@@ -347,7 +263,6 @@ fun VideoPlayerScreen(
                 }
             }
         } else {
-
             // 直接用 VideoItem 的宽高（扫描时已从 MediaStore 获取）
             val videoRatio = if (video.width > 0 && video.height > 0) {
                 video.width.toFloat() / video.height.toFloat()
@@ -365,7 +280,6 @@ fun VideoPlayerScreen(
                     .fillMaxHeight()
                     .aspectRatio(videoRatio)
             }
-            //videoModifier = Modifier.fillMaxSize()
 
             AndroidView(
                 factory = { ctx ->
@@ -376,8 +290,8 @@ fun VideoPlayerScreen(
                                 width: Int,
                                 height: Int
                             ) {
-                                currentSurface = Surface(st)
-                                surfaceReady = true
+                                val surface = Surface(st)
+                                viewModel.onSurfaceReady(surface, video)
                             }
 
                             override fun onSurfaceTextureSizeChanged(
@@ -388,9 +302,7 @@ fun VideoPlayerScreen(
                             }
 
                             override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
-                                currentSurface?.release()
-                                currentSurface = null
-                                surfaceReady = false
+                                viewModel.onSurfaceDestroyed()
                                 return true
                             }
 
@@ -402,7 +314,7 @@ fun VideoPlayerScreen(
             )
 
             // 加载中指示
-            if (!isPrepared) {
+            if (!viewModel.isPrepared) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -435,7 +347,7 @@ fun VideoPlayerScreen(
 
         // 中央大播放/暂停按钮（暂停或控件隐藏时显示）
         AnimatedVisibility(
-            visible = showControls && !hasError,
+            visible = viewModel.showControls && !viewModel.hasError,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.Center),
@@ -446,21 +358,14 @@ fun VideoPlayerScreen(
                     .clip(CircleShape)
                     .background(Color.White.copy(alpha = 0.85f))
                     .clickable {
-                        if (isPrepared) {
-                            if (isPlaying) {
-                                mediaPlayer.pause()
-                            } else {
-                                mediaPlayer.start()
-                            }
-                            isPlaying = !isPlaying
-                        }
-                        showControls = true
+                        viewModel.togglePlayPause()
+                        viewModel.showControls()
                     },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) "暂停" else "播放",
+                    imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (viewModel.isPlaying) "暂停" else "播放",
                     tint = VideoBackground,
                     modifier = Modifier.size(36.dp)
                 )
@@ -469,7 +374,7 @@ fun VideoPlayerScreen(
 
         // ========== 顶部渐隐背景 ==========
         AnimatedVisibility(
-            visible = showControls,
+            visible = viewModel.showControls,
             enter = fadeIn(),
             exit = fadeOut()
         ) {
@@ -491,7 +396,7 @@ fun VideoPlayerScreen(
 
         // ========== 顶部控制栏 ==========
         AnimatedVisibility(
-            visible = showControls,
+            visible = viewModel.showControls,
             enter = fadeIn(),
             exit = fadeOut()
         ) {
@@ -540,9 +445,10 @@ fun VideoPlayerScreen(
 
         // ========== 底部渐隐背景 ==========
         AnimatedVisibility(
-            visible = showControls,
+            visible = viewModel.showControls,
             enter = fadeIn(),
-            exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter),
         ) {
             Box(
                 modifier = Modifier
@@ -561,7 +467,7 @@ fun VideoPlayerScreen(
 
         // ========== 底部控制栏 ==========
         AnimatedVisibility(
-            visible = showControls,
+            visible = viewModel.showControls,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter)
@@ -574,15 +480,14 @@ fun VideoPlayerScreen(
                     .padding(bottom = 8.dp)
             ) {
                 ProgressBar(
-                    currentPositionMs = currentPositionMs,
+                    currentPositionMs = viewModel.currentPositionMs,
                     durationMs = video.durationMs.toFloat(),
-                    isPrepared = isPrepared,
+                    isPrepared = viewModel.isPrepared,
                     fallbackDurationMs = video.durationMs.toFloat(),
                     fallbackDurationText = video.formattedDuration,
                     onSeek = { seekMs ->
-                        if (isPrepared) mediaPlayer.seekTo(seekMs)
-                        currentPositionMs = seekMs.toFloat()
-                        showControls = true
+                        viewModel.seekTo(seekMs)
+                        viewModel.showControls()
                     }
                 )
 
@@ -597,7 +502,7 @@ fun VideoPlayerScreen(
                     // 播放速度
                     Box {
                         IconButton(
-                            onClick = { showSpeedMenu = true },
+                            onClick = { viewModel.showSpeedMenu = true },
                             modifier = Modifier.size(44.dp)
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -608,32 +513,28 @@ fun VideoPlayerScreen(
                                     modifier = Modifier.size(24.dp)
                                 )
                                 Text(
-                                    text = "${playbackSpeed}x",
+                                    text = "${viewModel.playbackSpeed}x",
                                     color = Color.White.copy(alpha = 0.7f),
                                     fontSize = 10.sp
                                 )
                             }
                         }
                         DropdownMenu(
-                            expanded = showSpeedMenu,
-                            onDismissRequest = { showSpeedMenu = false }
+                            expanded = viewModel.showSpeedMenu,
+                            onDismissRequest = { viewModel.dismissSpeedMenu() }
                         ) {
                             listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { speed ->
                                 DropdownMenuItem(
                                     text = {
                                         Text(
                                             text = "${speed}x",
-                                            fontWeight = if (speed == playbackSpeed) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (speed == playbackSpeed) VideoPrimary else Color.Unspecified
+                                            fontWeight = if (speed == viewModel.playbackSpeed) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (speed == viewModel.playbackSpeed) VideoPrimary else Color.Unspecified
                                         )
                                     },
                                     onClick = {
-                                        playbackSpeed = speed
-                                        if (isPrepared) {
-                                            mediaPlayer.playbackParams =
-                                                PlaybackParams().setSpeed(speed)
-                                        }
-                                        showSpeedMenu = false
+                                        viewModel.setSpeed(speed)
+                                        viewModel.dismissSpeedMenu()
                                     }
                                 )
                             }
@@ -643,13 +544,8 @@ fun VideoPlayerScreen(
                     // 后退10秒
                     IconButton(
                         onClick = {
-                            if (isPrepared) {
-                                val newPos =
-                                    (mediaPlayer.currentPosition - 10_000).coerceAtLeast(0)
-                                mediaPlayer.seekTo(newPos)
-                                currentPositionMs = newPos.toFloat()
-                            }
-                            showControls = true
+                            viewModel.skipBackward()
+                            viewModel.showControls()
                         },
                         modifier = Modifier.size(48.dp)
                     ) {
@@ -671,15 +567,8 @@ fun VideoPlayerScreen(
                     // 播放/暂停
                     IconButton(
                         onClick = {
-                            if (isPrepared) {
-                                if (isPlaying) {
-                                    mediaPlayer.pause()
-                                } else {
-                                    mediaPlayer.start()
-                                }
-                                isPlaying = !isPlaying
-                            }
-                            showControls = true
+                            viewModel.togglePlayPause()
+                            viewModel.showControls()
                         },
                         modifier = Modifier
                             .size(56.dp)
@@ -687,8 +576,8 @@ fun VideoPlayerScreen(
                             .background(VideoPrimary)
                     ) {
                         Icon(
-                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (isPlaying) "暂停" else "播放",
+                            imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (viewModel.isPlaying) "暂停" else "播放",
                             tint = Color(0xFF003544),
                             modifier = Modifier.size(32.dp)
                         )
@@ -697,14 +586,8 @@ fun VideoPlayerScreen(
                     // 前进10秒
                     IconButton(
                         onClick = {
-                            if (isPrepared) {
-                                val limit = video.durationMs.toInt()
-                                val newPos = (mediaPlayer.currentPosition + 10_000)
-                                    .coerceAtMost(limit)
-                                mediaPlayer.seekTo(newPos)
-                                currentPositionMs = newPos.toFloat()
-                            }
-                            showControls = true
+                            viewModel.skipForward()
+                            viewModel.showControls()
                         },
                         modifier = Modifier.size(48.dp)
                     ) {
@@ -744,14 +627,13 @@ fun VideoPlayerScreen(
                         )
                     }
                 }
-
             }
         }
 
         // ========== 手势提示覆盖层 ==========
         // 左侧 - 亮度调节
         AnimatedVisibility(
-            visible = showBrightnessOverlay,
+            visible = viewModel.showBrightnessOverlay,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -773,7 +655,7 @@ fun VideoPlayerScreen(
                     fontSize = 12.sp
                 )
                 Text(
-                    text = "${(brightness * 100).toInt()}%",
+                    text = "${(viewModel.brightness * 100).toInt()}%",
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = 11.sp
                 )
@@ -782,7 +664,7 @@ fun VideoPlayerScreen(
 
         // 右侧 - 音量调节
         AnimatedVisibility(
-            visible = showVolumeOverlay,
+            visible = viewModel.showVolumeOverlay,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -809,7 +691,7 @@ fun VideoPlayerScreen(
                     fontSize = 12.sp
                 )
                 Text(
-                    text = "${(volume * 100).toInt()}%",
+                    text = "${(viewModel.volume * 100).toInt()}%",
                     color = Color.White.copy(alpha = 0.7f),
                     fontSize = 11.sp
                 )

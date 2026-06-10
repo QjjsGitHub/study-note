@@ -54,6 +54,7 @@ import com.example.study.videoPlayer.ui.theme.VideoControlBg
 import com.example.study.videoPlayer.ui.theme.VideoOnSurfaceVariant
 import com.example.study.videoPlayer.ui.theme.VideoPrimary
 import com.example.study.videoPlayer.ui.theme.VideoSurfaceVariant
+import com.example.study.videoPlayer.viewmodel.VideoListViewModel
 
 // 预创建 shape / 颜色，避免组合中反复 new
 private val CardShape = RoundedCornerShape(12.dp)
@@ -65,8 +66,7 @@ private val BadgeBg = VideoPrimary.copy(alpha = 0.15f)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoListScreen(
-    videos: List<VideoItem>,
-    isScanning: Boolean = false,
+    viewModel: VideoListViewModel,
     onVideoClick: (VideoItem) -> Unit,
     onRefresh: () -> Unit = {},
     onScan: () -> Unit = {}
@@ -135,7 +135,7 @@ fun VideoListScreen(
             )
         }
     ) { padding ->
-        if (isScanning) {
+        if (viewModel.isScanning) {
             // 扫描中 — 显示加载进度圈
             Box(
                 modifier = Modifier
@@ -163,7 +163,7 @@ fun VideoListScreen(
                     )
                 }
             }
-        } else if (videos.isEmpty()) {
+        } else if (viewModel.videoList.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -202,9 +202,9 @@ fun VideoListScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // 头部统计信息
-                item(span = { GridItemSpan(2) }) { StorageInfoHeader(videos) }
+                item(span = { GridItemSpan(2) }) { StorageInfoHeader(viewModel.videoList) }
                 // 视频列表
-                items(videos, key = { it.id }) { video ->
+                items(viewModel.videoList, key = { it.id }) { video ->
                     VideoCard(video = video, onClick = { onVideoClick(video) })
                 }
                 // 底部间距
@@ -269,11 +269,10 @@ private fun VideoCard(video: VideoItem, onClick: () -> Unit) {
             .background(CardBg, shape = CardShape)
             .clickable(onClick = onClick)
     ) {
-        // 缩略图 — aspectRatio 从宽度推导高度，无需文本测量
+        // 缩略图
         ThumbnailPlaceholder(video)
 
         // 固定高度文本区 — 避免每次滚动进入视野时测量文字
-
         Text(
             text = video.title,
             style = MaterialTheme.typography.bodyMedium,
@@ -295,7 +294,6 @@ private fun VideoCard(video: VideoItem, onClick: () -> Unit) {
                 .padding(start = 10.dp)
                 .height(16.dp)
         )
-
     }
 }
 
