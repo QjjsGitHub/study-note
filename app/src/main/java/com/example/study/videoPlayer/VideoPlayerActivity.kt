@@ -6,12 +6,10 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
-import coil.Coil
-import coil.ImageLoader
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
@@ -27,8 +25,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
+import coil.Coil
+import coil.ImageLoader
 import com.example.study.videoPlayer.model.VideoItem
 import com.example.study.videoPlayer.ui.screens.VideoListScreen
 import com.example.study.videoPlayer.ui.screens.VideoPlayerScreen
@@ -56,8 +54,8 @@ class VideoPlayerActivity : ComponentActivity() {
 
         // 注册 Coil ImageLoader：content:// 视频 URI → loadThumbnail()
         Coil.setImageLoader(
-            ImageLoader.Builder(this)
-                .components { add(VideoThumbnailFetcher.Factory(this@VideoPlayerActivity)) }
+            ImageLoader.Builder(applicationContext)
+                .components { add(VideoThumbnailFetcher.Factory(applicationContext)) }
                 .crossfade(true)
                 .build()
         )

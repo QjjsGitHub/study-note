@@ -79,7 +79,7 @@ class DataActivity : ComponentActivity() {
 
         setContent {
             StudyTheme {
-                MainUI("")
+                MainUI()
             }
         }
 
@@ -95,7 +95,7 @@ class DataActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainUI(name: String, modifier: Modifier = Modifier) {
+fun MainUI(modifier: Modifier = Modifier) {
 
     // 使用状态栏高度 例如在布局中使用
     //val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -406,19 +406,15 @@ fun MainUI(name: String, modifier: Modifier = Modifier) {
                 val imagePaths = remember { mutableStateOf<Array<String>>(arrayOf()) }
                 val sliderPosition = remember { mutableFloatStateOf(0f) } // 初始位置
 
-                val imageLoader =
-                    ImageLoader.Builder(context).memoryCachePolicy(CachePolicy.DISABLED) // 启用内存缓存
+                val imageLoader = remember {
+                    ImageLoader.Builder(context.applicationContext)
+                        .memoryCachePolicy(CachePolicy.DISABLED) // 启用内存缓存
                         .diskCachePolicy(CachePolicy.ENABLED)
-                        /*.memoryCache {
-                            MemoryCache.Builder(context)
-                                .maxSizePercent(0.2)           // 内存缓存占应用内存的 20%
-                                .build()
-                        }*/
                         .diskCache {
                             DiskCache.Builder()
                                 .directory(
-                                    context.getExternalFilesDir("myDir")
-                                        ?.resolve("coil_cache") ?: context.getDir(
+                                    context.applicationContext.getExternalFilesDir("myDir")
+                                        ?.resolve("coil_cache") ?: context.applicationContext.getDir(
                                         "myDir",
                                         Context.MODE_PRIVATE
                                     ).resolve(
@@ -429,15 +425,12 @@ fun MainUI(name: String, modifier: Modifier = Modifier) {
                                 .build()
                         }
                         .build()
+                }
 
                 val painter =
                     rememberAsyncImagePainter(
-                        /*Builder(context).data(imagePath.value).apply(
-                            block = { -> crossfade(true) }).build()*/
-                        model = ImageRequest.Builder(context).data(imagePath.value)
-                            .crossfade(true).size(100, 100)/*.setParameter(
-                                "width", "500"
-                            )*/
+                        model = ImageRequest.Builder(context.applicationContext).data(imagePath.value)
+                            .crossfade(true).size(100, 100)
                             .build(),
                         imageLoader = imageLoader
                     )
@@ -504,7 +497,7 @@ fun MainUI(name: String, modifier: Modifier = Modifier) {
                 {
 
                     AsyncImage(
-                        model = ImageRequest.Builder(context)
+                        model = ImageRequest.Builder(context.applicationContext)
                             .data("/storage/emulated/0/DCIM/Camera/IMG_20240502_164103.jpg")
                             .crossfade(true)                    // 启用交叉淡入淡出
                             .placeholder(R.drawable.ic_home_black_24dp) // 占位图资源
@@ -547,7 +540,12 @@ fun MainUI(name: String, modifier: Modifier = Modifier) {
 
 
                     val url = "https://www.baidu.com/img/PCfb_5bf082d29588c07f842ccde3f97243ea.png"
-                    val painter1 = rememberAsyncImagePainter(model = url)
+                    val painter1 = rememberAsyncImagePainter(
+                        model = ImageRequest.Builder(context.applicationContext)
+                            .data(url)
+                            .build(),
+                        imageLoader = imageLoader
+                    )
                     SubcomposeAsyncImage(
                         model = url,
                         imageLoader = imageLoader,
@@ -599,7 +597,6 @@ fun MainUIPreview() {
     StudyTheme {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             MainUI(
-                name = "Android",
                 modifier = Modifier.padding(innerPadding)
             )
         }
