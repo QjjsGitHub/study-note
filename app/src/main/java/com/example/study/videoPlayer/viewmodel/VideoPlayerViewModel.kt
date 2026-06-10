@@ -2,9 +2,6 @@ package com.example.study.videoPlayer.viewmodel
 
 import android.app.Application
 import android.media.MediaPlayer
-import android.media.PlaybackParams
-import android.net.Uri
-import android.util.Log
 import android.view.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -15,16 +12,17 @@ import androidx.lifecycle.viewModelScope
 import com.example.study.videoPlayer.model.VideoItem
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import androidx.core.net.toUri
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 视频播放 ViewModel — 管理 MediaPlayer 生命周期、播放状态、亮度/音量。
  */
 class VideoPlayerViewModel(application: Application) : AndroidViewModel(application) {
 
-    // ════════════════════════════════════════════════════════════════
-    // 播放状态
-    // ════════════════════════════════════════════════════════════════
+    // ── 播放状态 ───────────────────────────────────────────────────
     var isPlaying by mutableStateOf(false)
         private set
     var isPrepared by mutableStateOf(false)
@@ -40,26 +38,20 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     var surfaceReady by mutableStateOf(false)
         private set
 
-    // ════════════════════════════════════════════════════════════════
-    // UI 控制状态
-    // ════════════════════════════════════════════════════════════════
+    // ── UI 控制状态 ────────────────────────────────────────────────
     var showControls by mutableStateOf(true)
         private set
     var showSpeedMenu by mutableStateOf(false)
     var showBrightnessOverlay by mutableStateOf(false)
     var showVolumeOverlay by mutableStateOf(false)
 
-    // ════════════════════════════════════════════════════════════════
-    // 亮度 / 音量（由 composable 同步到系统）
-    // ════════════════════════════════════════════════════════════════
+    // ── 亮度 / 音量（由 composable 同步到系统） ──────────────────────
     var brightness by mutableFloatStateOf(0.5f)
         private set
     var volume by mutableFloatStateOf(0.5f)
         private set
 
-    // ════════════════════════════════════════════════════════════════
-    // 内部
-    // ════════════════════════════════════════════════════════════════
+    // ── 内部资源 ───────────────────────────────────────────────────
     private val mediaPlayer = MediaPlayer()
     private var currentVideo: VideoItem? = null
     private var currentSurface: Surface? = null
@@ -67,13 +59,16 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private var controlsAutoHideJob: Job? = null
 
     init {
+        setupMediaPlayer()
+    }
+
+    private fun setupMediaPlayer() {
         mediaPlayer.setOnPreparedListener { mp ->
             isPrepared = true
+            hasError = false
             mp.start()
             isPlaying = true
-            if (playbackSpeed != 1.0f) {
-                mp.playbackParams = PlaybackParams().setSpeed(playbackSpeed)
-            }
+            updatePlaybackSpeed(playbackSpeed)
             startProgressPolling()
             scheduleControlsAutoHide()
         }
@@ -82,7 +77,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             hasError = true
             isPrepared = false
             stopProgressPolling()
-            true
+            false // 不拦截，让系统可能弹出对话框或记录日志
         }
 
         mediaPlayer.setOnCompletionListener {
@@ -91,16 +86,12 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 currentPositionMs = it.durationMs.toFloat()
             }
             stopProgressPolling()
+            showControls = true
         }
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // Surface 管理
-    // ════════════════════════════════════════════════════════════════
+    // ── Surface 管理 ────────────────────────────────────────────────
 
-    /**
-     * TextureView Surface 就绪时调用。
-     */
     fun onSurfaceReady(surface: Surface, video: VideoItem) {
         currentSurface = surface
         currentVideo = video
@@ -108,27 +99,24 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         preparePlayer(video, surface)
     }
 
-    /**
-     * TextureView Surface 销毁时调用。
-     */
     fun onSurfaceDestroyed() {
         stopProgressPolling()
-        try {
-            mediaPlayer.pause()
-        } catch (_: Exception) {}
+        safeExecute {
+            if (mediaPlayer.isPlaying) {
+                mediaPlayer.pause()
+            }
+        }
         isPlaying = false
         surfaceReady = false
         currentSurface?.release()
         currentSurface = null
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // 播放控制
-    // ════════════════════════════════════════════════════════════════
+    // ── 播放控制 ───────────────────────────────────────────────────
 
     fun togglePlayPause() {
         if (!isPrepared) return
-        try {
+        safeExecute {
             if (isPlaying) {
                 mediaPlayer.pause()
                 stopProgressPolling()
@@ -138,14 +126,14 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 scheduleControlsAutoHide()
             }
             isPlaying = !isPlaying
-        } catch (_: Exception) {}
+        }
     }
 
     fun seekTo(seekMs: Int) {
         if (isPrepared) {
-            try {
+            safeExecute {
                 mediaPlayer.seekTo(seekMs)
-            } catch (_: Exception) {}
+            }
         }
         currentPositionMs = seekMs.toFloat()
     }
@@ -153,32 +141,36 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     fun skipBackward() {
         if (!isPrepared) return
         val newPos = (mediaPlayer.currentPosition - 10_000).coerceAtLeast(0)
-        mediaPlayer.seekTo(newPos)
-        currentPositionMs = newPos.toFloat()
+        seekTo(newPos)
     }
 
     fun skipForward() {
         if (!isPrepared) return
         val limit = currentVideo?.durationMs?.toInt() ?: return
         val newPos = (mediaPlayer.currentPosition + 10_000).coerceAtMost(limit)
-        mediaPlayer.seekTo(newPos)
-        currentPositionMs = newPos.toFloat()
+        seekTo(newPos)
     }
 
     fun setSpeed(speed: Float) {
         playbackSpeed = speed
+        updatePlaybackSpeed(speed)
+    }
+
+    private fun updatePlaybackSpeed(speed: Float) {
         if (isPrepared) {
-            try {
-                mediaPlayer.playbackParams = PlaybackParams().setSpeed(speed)
-            } catch (_: Exception) {}
+            safeExecute {
+                mediaPlayer.playbackParams = mediaPlayer.playbackParams.setSpeed(speed)
+            }
         }
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // UI 控制
-    // ════════════════════════════════════════════════════════════════
+    // ── UI 控制 ────────────────────────────────────────────────────
 
-    fun toggleControls() { showControls = !showControls }
+    fun toggleControls() {
+        showControls = !showControls
+        if (showControls) scheduleControlsAutoHide()
+    }
+
     fun showControls() {
         showControls = true
         scheduleControlsAutoHide()
@@ -186,29 +178,19 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun dismissSpeedMenu() { showSpeedMenu = false }
 
-    fun showBrightnessIndicator() { showBrightnessOverlay = true }
-    fun showVolumeIndicator() { showVolumeOverlay = true }
-
-    /** 更新亮度值（范围 0.01~1f） */
     fun updateBrightness(value: Float) {
         brightness = value.coerceIn(0.01f, 1f)
     }
 
-    /** 更新音量值（范围 0~1f） */
     fun updateVolume(value: Float) {
         volume = value.coerceIn(0f, 1f)
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // 生命周期
-    // ════════════════════════════════════════════════════════════════
+    // ── 生命周期 ───────────────────────────────────────────────────
 
-    /** Activity onPause 时调用 */
     fun onPause() {
         if (isPlaying) {
-            try {
-                mediaPlayer.pause()
-            } catch (_: Exception) {}
+            safeExecute { mediaPlayer.pause() }
             isPlaying = false
             stopProgressPolling()
         }
@@ -218,48 +200,39 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         super.onCleared()
         stopProgressPolling()
         cancelControlsAutoHide()
-        try {
-            mediaPlayer.release()
-        } catch (_: Exception) {}
-        try {
-            currentSurface?.release()
-            currentSurface = null
-        } catch (_: Exception) {}
+        safeExecute { mediaPlayer.release() }
+        currentSurface?.release()
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // 私有方法
-    // ════════════════════════════════════════════════════════════════
+    // ── 私有助手 ────────────────────────────────────────────────────
 
     private fun preparePlayer(video: VideoItem, surface: Surface) {
-        try {
+        safeExecute {
             mediaPlayer.reset()
             isPrepared = false
             hasError = false
             stopProgressPolling()
 
-            val contentUri = video.thumbnailPath?.let { Uri.parse(it) }
-            if (contentUri != null && contentUri.scheme == "content") {
-                mediaPlayer.setDataSource(getApplication(), contentUri)
+            val uri = (video.thumbnailPath ?: "").toUri()
+            if (uri.scheme == "content") {
+                mediaPlayer.setDataSource(getApplication(), uri)
             } else {
                 mediaPlayer.setDataSource(video.filePath)
             }
 
             mediaPlayer.setSurface(surface)
             mediaPlayer.prepareAsync()
-        } catch (_: Exception) {
-            hasError = true
         }
     }
 
     private fun startProgressPolling() {
         progressJob?.cancel()
         progressJob = viewModelScope.launch {
-            while (isPlaying && isPrepared) {
-                try {
+            while (isActive && isPlaying && isPrepared) {
+                safeExecute {
                     currentPositionMs = mediaPlayer.currentPosition.toFloat()
-                } catch (_: Exception) {}
-                delay(1000L)
+                }
+                delay(200L.milliseconds) // 提高到 200ms 一次，让进度条更顺滑
             }
         }
     }
@@ -272,8 +245,8 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private fun scheduleControlsAutoHide() {
         cancelControlsAutoHide()
         controlsAutoHideJob = viewModelScope.launch {
-            delay(4000L)
-            if (isPlaying) {
+            delay(5000L.milliseconds)
+            if (isPlaying && isActive) {
                 showControls = false
             }
         }
@@ -282,5 +255,14 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private fun cancelControlsAutoHide() {
         controlsAutoHideJob?.cancel()
         controlsAutoHideJob = null
+    }
+
+    /** 安全执行 MediaPlayer 操作，防止 IllegalStateException 导致崩溃 */
+    private inline fun safeExecute(action: () -> Unit) {
+        try {
+            action()
+        } catch (_: Exception) {
+            // Log.e("VideoPlayerVM", "MediaPlayer Error", e)
+        }
     }
 }
