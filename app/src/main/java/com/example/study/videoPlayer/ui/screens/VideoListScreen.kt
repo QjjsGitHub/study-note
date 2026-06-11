@@ -19,7 +19,11 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VideoLibrary
@@ -32,9 +36,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,10 +49,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
@@ -75,69 +86,145 @@ fun VideoListScreen(
     onScan: () -> Unit = {}
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val focusRequester = remember { FocusRequester() }
+
+    // 进入搜索模式时自动聚焦输入框
+    LaunchedEffect(viewModel.isSearchActive) {
+        if (viewModel.isSearchActive) {
+            focusRequester.requestFocus()
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.VideoLibrary,
-                            contentDescription = null,
-                            tint = VideoPrimary,
-                            modifier = Modifier.size(28.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "本地视频",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 20.sp
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { /* 搜索 */ }) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "搜索",
-                            tint = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
-                    Box {
-                        IconButton(onClick = { showMenu = true }) {
+            if (viewModel.isSearchActive) {
+                // ── 搜索栏 ──
+                TopAppBar(
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            focusManager.clearFocus()
+                            viewModel.deactivateSearch()
+                        }) {
                             Icon(
-                                imageVector = Icons.Default.MoreVert,
-                                contentDescription = "更多",
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "关闭搜索",
                                 tint = MaterialTheme.colorScheme.onBackground
                             )
                         }
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("刷新列表") },
-                                onClick = { showMenu = false; onRefresh() }
+                    },
+                    title = {
+                        TextField(
+                            value = viewModel.searchQuery,
+                            onValueChange = { viewModel.updateSearchQuery(it) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(focusRequester),
+                            placeholder = {
+                                Text(
+                                    text = "搜索标题、路径、分辨率…",
+                                    color = VideoOnSurfaceVariant
+                                )
+                            },
+                            singleLine = true,
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                                focusedTextColor = MaterialTheme.colorScheme.onBackground,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onBackground,
+                                cursorColor = VideoPrimary
+                            ),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                            keyboardActions = KeyboardActions(
+                                onSearch = { focusManager.clearFocus() }
+                            ),
+                            textStyle = MaterialTheme.typography.bodyLarge
+                        )
+                    },
+                    actions = {
+                        if (viewModel.searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.updateSearchQuery("") }) {
+                                Icon(
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "清除",
+                                    tint = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
+                    )
+                )
+            } else {
+                // ── 普通顶栏 ──
+                TopAppBar(
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.VideoLibrary,
+                                contentDescription = null,
+                                tint = VideoPrimary,
+                                modifier = Modifier.size(28.dp)
                             )
-                            DropdownMenuItem(
-                                text = { Text("排序方式") },
-                                onClick = { showMenu = false }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("扫描目录") },
-                                onClick = { showMenu = false; onScan() }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "本地视频",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 20.sp
                             )
                         }
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                    },
+                    actions = {
+                        IconButton(onClick = { viewModel.activateSearch() }) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "搜索",
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                        Box {
+                            IconButton(onClick = { showMenu = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.MoreVert,
+                                    contentDescription = "更多",
+                                    tint = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("刷新列表") },
+                                    onClick = { showMenu = false; onRefresh() }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("排序方式") },
+                                    onClick = { showMenu = false }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("扫描目录") },
+                                    onClick = { showMenu = false; onScan() }
+                                )
+                            }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        titleContentColor = MaterialTheme.colorScheme.onBackground
+                    )
                 )
-            )
+            }
         }
     ) { padding ->
+        // 使用过滤后的列表进行展示
+        val displayList = viewModel.filteredVideoList
+        val hasQuery = viewModel.debouncedQuery.isNotEmpty()
+
         if (viewModel.isScanning) {
             // 扫描中 — 显示加载进度圈
             Box(
@@ -166,7 +253,37 @@ fun VideoListScreen(
                     )
                 }
             }
-        } else if (viewModel.videoList.isEmpty()) {
+        } else if (hasQuery && displayList.isEmpty()) {
+            // 搜索无结果
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = VideoOnSurfaceVariant,
+                        modifier = Modifier.size(64.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "未找到匹配的视频",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = VideoOnSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "试试其他关键词",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = VideoOnSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                }
+            }
+        } else if (displayList.isEmpty() && !viewModel.hasScanned) {
+            // 未扫描过且无数据
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -204,18 +321,47 @@ fun VideoListScreen(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                // 头部统计信息
-                item(span = { GridItemSpan(2) }) {
-                    StorageInfoHeader(
-                        totalCount = viewModel.videoList.size,
-                        totalSizeBytes = viewModel.totalSizeBytes
-                    )
+                // 头部统计信息（仅在非搜索模式下显示）
+                if (!hasQuery) {
+                    item(span = { GridItemSpan(2) }) {
+                        StorageInfoHeader(
+                            totalCount = viewModel.videoList.size,
+                            totalSizeBytes = viewModel.totalSizeBytes
+                        )
+                    }
+                } else {
+                    // 搜索模式：显示过滤结果数
+                    item(span = { GridItemSpan(2) }) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(HeaderBg, shape = CardShape)
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "找到 ${displayList.size} 个匹配视频",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(modifier = Modifier.weight(1f))
+                            Text(
+                                text = "\"${viewModel.debouncedQuery}\"",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = VideoPrimary,
+                                modifier = Modifier
+                                    .background(BadgeBg, shape = BadgeShape)
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
                 }
                 // 视频列表
                 items(
-                    items = viewModel.videoList,
+                    items = displayList,
                     key = { it.id },
-                    contentType = { "video_card" } // 添加 contentType 提升复用效率
+                    contentType = { "video_card" }
                 ) { video ->
                     VideoCard(video = video, onClick = { onVideoClick(video) })
                 }
