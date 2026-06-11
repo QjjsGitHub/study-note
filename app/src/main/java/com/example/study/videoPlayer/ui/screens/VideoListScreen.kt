@@ -462,14 +462,14 @@ private fun ThumbnailPlaceholder(video: VideoItem) {
     val context = androidx.compose.ui.platform.LocalContext.current
 
     // 优化：显式指定 ImageRequest 的 size 和 precision，提升滑动时的响应速度
-    val request = remember(video.thumbnailPath) {
+    val request = remember(video.contentUri) {
         coil.request.ImageRequest.Builder(context)
-            .data(video.thumbnailPath)
+            .data(video.contentUri)
             .crossfade(false)
             .size(350, 200) // 根据 2 列网格的实际宽度估算
             .precision(coil.size.Precision.INEXACT) // 允许非精确匹配以提高加载速度
-            .memoryCacheKey(video.thumbnailPath)
-            .diskCacheKey(video.thumbnailPath)
+            .memoryCacheKey(video.contentUri)
+            .diskCacheKey(video.contentUri)
             .build()
     }
 

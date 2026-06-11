@@ -64,10 +64,6 @@ class VideoListViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
 
-    /** 搜索结果的视频总大小 */
-    val filteredTotalSizeBytes: Long
-        get() = filteredVideoList.sumOf { it.fileSizeBytes }
-
     // ── 防抖 Job
     private var searchDebounceJob: Job? = null
 
@@ -98,7 +94,7 @@ class VideoListViewModel(application: Application) : AndroidViewModel(applicatio
         searchDebounceJob?.cancel()
     }
 
-    /** 输入时调用，100ms 防抖后更新过滤关键字 */
+    /** 输入时调用，200ms 防抖后更新过滤关键字 */
     fun updateSearchQuery(query: String) {
         searchQuery = query
         searchDebounceJob?.cancel()

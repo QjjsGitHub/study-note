@@ -11,25 +11,20 @@ import com.example.study.videoPlayer.model.VideoItem
  */
 object VideoScanner {
 
-    private val VIDEO_PROJECTION = mutableListOf(
-        MediaStore.Video.Media._ID,
-        MediaStore.Video.Media.TITLE,
-        MediaStore.Video.Media.DATA,
-        MediaStore.Video.Media.DURATION,
-        MediaStore.Video.Media.SIZE,
+    private val VIDEO_PROJECTION = buildList {
+        add(MediaStore.Video.Media._ID)
+        add(MediaStore.Video.Media.TITLE)
+        add(MediaStore.Video.Media.DATA)
+        add(MediaStore.Video.Media.DURATION)
+        add(MediaStore.Video.Media.SIZE)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            MediaStore.Video.Media.WIDTH
-        } else {
-            "width"
-        },
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            MediaStore.Video.Media.HEIGHT
-        } else {
-            "height"
-        }
-    ).apply {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            add(MediaStore.Video.Media.WIDTH)
+            add(MediaStore.Video.Media.HEIGHT)
             add(MediaStore.Video.Media.ORIENTATION)
+        } else {
+            add("width")
+            add("height")
         }
     }.toTypedArray()
 
@@ -97,7 +92,7 @@ object VideoScanner {
                         width = width,
                         height = height,
                         resolution = resolution,
-                        thumbnailPath = contentUri.toString()
+                        contentUri = contentUri.toString()
                     )
                 )
             }

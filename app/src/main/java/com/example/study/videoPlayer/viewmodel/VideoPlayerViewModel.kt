@@ -2,6 +2,7 @@ package com.example.study.videoPlayer.viewmodel
 
 import android.app.Application
 import android.media.MediaPlayer
+import android.util.Log
 import android.view.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -193,7 +194,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         scheduleControlsAutoHide()
     }
 
-    fun dismissSpeedMenu() { showSpeedMenu = false }
+    fun dismissSpeedMenu() {
+        showSpeedMenu = false
+    }
 
     fun updateBrightness(value: Float) {
         brightness = value.coerceIn(0.01f, 1f)
@@ -231,7 +234,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             resumeWhenSurfaceReady = false
             stopProgressPolling()
 
-            val uri = (video.thumbnailPath ?: "").toUri()
+            val uri = (video.contentUri ?: "").toUri()
             if (uri.scheme == "content") {
                 mediaPlayer.setDataSource(getApplication(), uri)
             } else {
@@ -279,8 +282,8 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private inline fun safeExecute(action: () -> Unit) {
         try {
             action()
-        } catch (_: Exception) {
-            // Log.e("VideoPlayerVM", "MediaPlayer Error", e)
+        } catch (e: Exception) {
+            Log.e("VideoPlayerVM", "MediaPlayer Error", e)
         }
     }
 }

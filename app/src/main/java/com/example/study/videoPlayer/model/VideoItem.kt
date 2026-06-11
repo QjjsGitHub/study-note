@@ -12,7 +12,8 @@ data class VideoItem(
     val width: Int = 0,
     val height: Int = 0,
     val resolution: String = "未知",
-    val thumbnailPath: String? = null
+    /** MediaStore video content URI, used for thumbnail loading and player data source. */
+    val contentUri: String? = null
 ) {
     /** 格式化时长，如 "01:23:45" 或 "12:34"（构造时预计算，避免滚动中重复算） */
     val formattedDuration: String = run {
