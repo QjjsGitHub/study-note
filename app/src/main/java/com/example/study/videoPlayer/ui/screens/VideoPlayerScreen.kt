@@ -13,6 +13,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,6 +43,7 @@ import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -63,8 +66,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -162,6 +167,24 @@ fun VideoPlayerScreen(
         }
     }
 
+    // ── 自由缩放与旋转状态 ──────────────────────────────────────────
+    var videoScale by remember { mutableFloatStateOf(1f) }
+    var videoOffset by remember { mutableStateOf(Offset.Zero) }
+    var videoRotation by remember { mutableFloatStateOf(0f) }
+    val transformState = rememberTransformableState { zoomChange, offsetChange, rotationChange ->
+        videoScale = (videoScale * zoomChange).coerceIn(0.5f, 5f)
+        videoRotation += rotationChange
+        
+        // 优化：只有在放大状态下（或由于旋转需要调整位置时）才允许平移
+        // 且增加 0.01 的阈值防止浮点数计算误差
+        if (videoScale > 1.01f || Math.abs(videoRotation) > 0.5f) {
+            videoOffset += offsetChange
+        } else if (videoScale <= 1.01f) {
+            // 缩小或接近原始大小时，强制居中
+            videoOffset = Offset.Zero
+        }
+    }
+
     // ── 组件销毁时恢复原始亮度 ──────────────────────────────────
     DisposableEffect(Unit) {
         onDispose {
@@ -182,6 +205,7 @@ fun VideoPlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(VideoBackground)
+            .transformable(state = transformState) // 绑定缩放平移手势
             .pointerInput(Unit) {
                 var accumulatedDrag = 0f
                 detectVerticalDragGestures(
@@ -292,7 +316,15 @@ fun VideoPlayerScreen(
                         })
                     }
                 },
-                modifier = videoModifier.align(Alignment.Center),
+                modifier = videoModifier
+                    .align(Alignment.Center)
+                    .graphicsLayer(
+                        scaleX = videoScale,
+                        scaleY = videoScale,
+                        translationX = videoOffset.x,
+                        translationY = videoOffset.y,
+                        rotationZ = videoRotation
+                    ),
             )
 
             // 加载中指示
@@ -459,8 +491,50 @@ fun VideoPlayerScreen(
                     .fillMaxWidth()
                     .navigationBarsPadding()
                     .padding(horizontal = 16.dp)
-                    .padding(bottom = 8.dp)
+                    .padding(bottom = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // --- 还原按钮 ---
+                // 使用阈值判断，避免浮点数误差导致按钮无法消失
+                val isTransformed = Math.abs(videoScale - 1f) > 0.01f || 
+                                   Math.abs(videoRotation) > 0.5f || 
+                                   videoOffset != Offset.Zero
+                AnimatedVisibility(
+                    visible = isTransformed,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .padding(bottom = 12.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color.Black.copy(alpha = 0.6f))
+                            .clickable {
+                                videoScale = 1f
+                                videoOffset = Offset.Zero
+                                videoRotation = 0f
+                            }
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "还原画面",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "还原画面",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+
                 ProgressBar(
                     currentPositionMs = viewModel.currentPositionMs,
                     durationMs = video.durationMs.toFloat(),
