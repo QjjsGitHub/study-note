@@ -4,18 +4,17 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import android.graphics.SurfaceTexture
 import android.media.AudioManager
-import android.view.SurfaceHolder
-import android.view.SurfaceView
+import android.view.Surface
+import android.view.TextureView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.gestures.rememberTransformableState
-import androidx.compose.foundation.gestures.transformable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -63,6 +62,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -89,6 +89,7 @@ import com.example.study.videoPlayer.ui.theme.VideoControlBg
 import com.example.study.videoPlayer.ui.theme.VideoPrimary
 import com.example.study.videoPlayer.viewmodel.VideoPlayerViewModel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.conflate
 import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -127,11 +128,17 @@ fun VideoPlayerScreen(
         viewModel.updateVolume(curVolume)
     }
 
-    // ── 同步 ViewModel 亮度 → 系统窗口 ──────────────────────────
-    LaunchedEffect(viewModel.brightness) {
-        val lp = activity.window.attributes
-        lp.screenBrightness = viewModel.brightness
-        activity.window.attributes = lp
+    // ── 同步 ViewModel 亮度 → 系统窗口（节流优化版） ──────────────────────────
+    LaunchedEffect(Unit) {
+        snapshotFlow { viewModel.brightness }
+            .conflate() // 合并过快的值，只保留最新值
+            .collect { value ->
+                val lp = activity.window.attributes
+                lp.screenBrightness = value
+                activity.window.attributes = lp
+                // 限制系统调用频率为每 40ms 一次 (~25 FPS)，足以保证视觉流畅且不阻塞系统
+                delay(40.milliseconds)
+            }
     }
 
     // ── 同步 ViewModel 音量 → AudioManager ─────────────────────
@@ -171,19 +178,6 @@ fun VideoPlayerScreen(
     var videoScale by remember { mutableFloatStateOf(1f) }
     var videoOffset by remember { mutableStateOf(Offset.Zero) }
     var videoRotation by remember { mutableFloatStateOf(0f) }
-    val transformState = rememberTransformableState { zoomChange, offsetChange, rotationChange ->
-        videoScale = (videoScale * zoomChange).coerceIn(0.5f, 5f)
-        videoRotation += rotationChange
-        
-        // 优化：只有在放大状态下（或由于旋转需要调整位置时）才允许平移
-        // 且增加 0.01 的阈值防止浮点数计算误差
-        if (videoScale > 1.01f || Math.abs(videoRotation) > 0.5f) {
-            videoOffset += offsetChange
-        } else if (videoScale <= 1.01f) {
-            // 缩小或接近原始大小时，强制居中
-            videoOffset = Offset.Zero
-        }
-    }
 
     // ── 组件销毁时恢复原始亮度 ──────────────────────────────────
     DisposableEffect(Unit) {
@@ -197,53 +191,48 @@ fun VideoPlayerScreen(
         }
     }
 
-    // 拖拽手势的临时状态（仅手势期间使用，不放入 ViewModel）
-    var dragStartBrightness by remember { mutableFloatStateOf(0f) }
-    var dragStartVolume by remember { mutableFloatStateOf(0f) }
-
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(VideoBackground)
-            .transformable(state = transformState) // 绑定缩放平移手势
+            // 1. 处理点击切换控制栏
             .pointerInput(Unit) {
-                var accumulatedDrag = 0f
-                detectVerticalDragGestures(
-                    onDragStart = { _ ->
-                        dragStartBrightness = viewModel.brightness
-                        dragStartVolume = viewModel.volume
-                        accumulatedDrag = 0f
-                    },
-                    onVerticalDrag = { change, dragAmount ->
-                        change.consume()
-                        accumulatedDrag += dragAmount
+                detectTapGestures(onTap = { viewModel.toggleControls() })
+            }
+            // 2. 统一手势处理器：解决调节与变换的冲突
+            .pointerInput(Unit) {
+                detectTransformGestures { centroid, pan, zoom, rotation ->
+                    // A. 计算多指状态或是否已处于变换状态
+                    val isMultiTouch = zoom != 1f || rotation != 0f
+                    val isTransformed = Math.abs(videoScale - 1f) > 0.01f || Math.abs(videoRotation) > 0.5f
 
-                        val halfW = size.width.toFloat() / 2f
-                        val fraction = -accumulatedDrag / (size.height.toFloat() / 3f) // 适当降低调节灵敏度
-
-                        if (change.position.x < halfW) {
+                    if (isMultiTouch || isTransformed) {
+                        // 变换模式：缩放、旋转、平移
+                        videoScale = (videoScale * zoom).coerceIn(0.5f, 5f)
+                        videoRotation += rotation
+                        
+                        // 只有在放大或旋转后，平移才生效（或正在多指操作中）
+                        if (videoScale > 1.01f || Math.abs(videoRotation) > 0.5f || isMultiTouch) {
+                            videoOffset += pan
+                        } else {
+                            videoOffset = Offset.Zero
+                        }
+                    } else {
+                        // 调节模式：画面未变换且是单指滑动，则调节音量/亮度
+                        // 计算滑动比例 (调节灵敏度：划过 1/3 屏幕高度即为全满)
+                        val fraction = -pan.y / (size.height.toFloat() / 3f)
+                        if (centroid.x < size.width / 2) {
                             // 左侧 — 亮度
-                            viewModel.updateBrightness(
-                                (dragStartBrightness + fraction).coerceIn(
-                                    0.01f,
-                                    1f
-                                )
-                            )
+                            viewModel.updateBrightness((viewModel.brightness + fraction).coerceIn(0.01f, 1f))
                             viewModel.showBrightnessOverlay = true
                         } else {
                             // 右侧 — 音量
-                            viewModel.updateVolume((dragStartVolume + fraction).coerceIn(0f, 1f))
+                            viewModel.updateVolume((viewModel.volume + fraction).coerceIn(0f, 1f))
                             viewModel.showVolumeOverlay = true
                         }
-                    },
-                    onDragEnd = {},
-                    onDragCancel = {}
-                )
+                    }
+                }
             }
-            .clickable(
-                indication = null,
-                interactionSource = remember { MutableInteractionSource() }
-            ) { viewModel.toggleControls() }
     ) {
         // ========== 视频画面 ==========
         if (viewModel.hasError) {
@@ -296,24 +285,31 @@ fun VideoPlayerScreen(
 
             AndroidView(
                 factory = { ctx ->
-                    SurfaceView(ctx).apply {
-                        holder.addCallback(object : SurfaceHolder.Callback {
-                            override fun surfaceCreated(h: SurfaceHolder) {
-                                viewModel.onSurfaceReady(h.surface, video)
+                    TextureView(ctx).apply {
+                        surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                            override fun onSurfaceTextureAvailable(
+                                st: SurfaceTexture,
+                                width: Int,
+                                height: Int
+                            ) {
+                                val surface = Surface(st)
+                                viewModel.onSurfaceReady(surface, video)
                             }
 
-                            override fun surfaceChanged(
-                                h: SurfaceHolder,
-                                f: Int,
-                                w: Int,
-                                h1: Int
+                            override fun onSurfaceTextureSizeChanged(
+                                st: SurfaceTexture,
+                                width: Int,
+                                height: Int
                             ) {
                             }
 
-                            override fun surfaceDestroyed(h: SurfaceHolder) {
+                            override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
                                 viewModel.onSurfaceDestroyed()
+                                return true
                             }
-                        })
+
+                            override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
+                        }
                     }
                 },
                 modifier = videoModifier
