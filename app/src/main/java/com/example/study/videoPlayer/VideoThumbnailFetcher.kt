@@ -43,8 +43,8 @@ class VideoThumbnailFetcher(
         val bitmap: Bitmap? = semaphore.withPermit {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val size = options.size
-                val width = size.width.pxOrElse { 512 }
-                val height = size.height.pxOrElse { 288 }
+                val width = size.width.pxOrElse { 350 }.coerceIn(96, 320)
+                val height = size.height.pxOrElse { 200 }.coerceIn(54, 180)
                 
                 try {
                     resolver.loadThumbnail(uri, Size(width, height), null)
@@ -65,7 +65,7 @@ class VideoThumbnailFetcher(
 
         DrawableResult(
             drawable = bitmap.toDrawable(resources),
-            isSampled = false,
+            isSampled = true,
             dataSource = DataSource.DISK,
         )
     }

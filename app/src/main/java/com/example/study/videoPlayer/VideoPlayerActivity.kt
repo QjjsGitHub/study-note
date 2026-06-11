@@ -25,6 +25,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import coil.Coil
 import coil.ImageLoader
 import com.example.study.videoPlayer.model.VideoItem
@@ -56,7 +59,7 @@ class VideoPlayerActivity : ComponentActivity() {
         Coil.setImageLoader(
             ImageLoader.Builder(applicationContext)
                 .components { add(VideoThumbnailFetcher.Factory(applicationContext)) }
-                .crossfade(true)
+                .crossfade(false)
                 .build()
         )
 
@@ -66,6 +69,22 @@ class VideoPlayerActivity : ComponentActivity() {
                 val listViewModel: VideoListViewModel by viewModels()
 
                 var currentVideo by remember { mutableStateOf<VideoItem?>(null) }
+
+                // ── 控制状态栏显示/隐藏 ──────────────────────
+                LaunchedEffect(currentVideo) {
+                    val window = this@VideoPlayerActivity.window
+                    val controller = WindowCompat.getInsetsController(window, window.decorView)
+                    if (currentVideo != null) {
+                        // 播放界面：隐藏状态栏
+                        controller.hide(WindowInsetsCompat.Type.statusBars())
+                        // 可选：设置隐藏行为（如滑动显示后自动隐藏）
+                        controller.systemBarsBehavior = 
+                            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    } else {
+                        // 列表界面：显示状态栏
+                        controller.show(WindowInsetsCompat.Type.statusBars())
+                    }
+                }
 
                 // ── 观察 ViewModel 一次性事件 ──────────────────────
                 LaunchedEffect(Unit) {

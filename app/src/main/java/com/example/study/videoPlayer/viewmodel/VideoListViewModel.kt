@@ -2,7 +2,6 @@ package com.example.study.videoPlayer.viewmodel
 
 import android.app.Application
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -23,6 +22,9 @@ class VideoListViewModel(application: Application) : AndroidViewModel(applicatio
 
     // ── UI 状态 ──────────────────────────────────────────────────────
     var videoList by mutableStateOf<List<VideoItem>>(emptyList())
+        private set
+
+    var totalSizeBytes by mutableStateOf(0L)
         private set
 
     var isScanning by mutableStateOf(false)
@@ -56,6 +58,7 @@ class VideoListViewModel(application: Application) : AndroidViewModel(applicatio
                     repository.scanAllVideos()
                 }
                 videoList = videos
+                totalSizeBytes = videos.sumOf { it.fileSizeBytes }
                 hasScanned = true
                 _events.send(ScanEvent.Success(videos.size))
             } catch (e: Exception) {

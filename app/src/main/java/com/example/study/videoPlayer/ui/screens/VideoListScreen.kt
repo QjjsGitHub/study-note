@@ -1,6 +1,5 @@
 package com.example.study.videoPlayer.ui.screens
 
-import coil.compose.AsyncImage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,10 +23,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -45,10 +44,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.study.videoPlayer.model.VideoItem
 import com.example.study.videoPlayer.ui.theme.VideoControlBg
 import com.example.study.videoPlayer.ui.theme.VideoOnSurfaceVariant
@@ -202,7 +205,12 @@ fun VideoListScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // 头部统计信息
-                item(span = { GridItemSpan(2) }) { StorageInfoHeader(viewModel.videoList) }
+                item(span = { GridItemSpan(2) }) {
+                    StorageInfoHeader(
+                        totalCount = viewModel.videoList.size,
+                        totalSizeBytes = viewModel.totalSizeBytes
+                    )
+                }
                 // 视频列表
                 items(
                     items = viewModel.videoList,
@@ -223,11 +231,8 @@ fun VideoListScreen(
 // ─── Header ──────────────────────────────────────────────────────────────────
 
 @Composable
-private fun StorageInfoHeader(videos: List<VideoItem>) {
-    val totalCount = videos.size
-    val totalGb = remember(videos) {
-        videos.sumOf { it.fileSizeBytes } / (1024.0 * 1024.0 * 1024.0)
-    }
+private fun StorageInfoHeader(totalCount: Int, totalSizeBytes: Long) {
+    val totalGb = totalSizeBytes / (1024.0 * 1024.0 * 1024.0)
 
     Row(
         modifier = Modifier
@@ -268,7 +273,7 @@ private fun VideoCard(video: VideoItem, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(150.dp)
+            .height(150.dp) // 增加 10dp 高度，给文字留出充足空间
             .clip(CardShape)
             .background(CardBg)
             .clickable(onClick = onClick)
@@ -276,28 +281,30 @@ private fun VideoCard(video: VideoItem, onClick: () -> Unit) {
         // 缩略图
         ThumbnailPlaceholder(video)
 
-        // 标题：强制单行，确保副标题不被挤占
+        // 合并显示标题与副标题，减少 UI 节点，性能更优
+        val onBgColor = MaterialTheme.colorScheme.onBackground
+        val titleStyle = MaterialTheme.typography.bodyMedium.toSpanStyle()
+        val subtitleStyle = MaterialTheme.typography.labelSmall.toSpanStyle()
+
         Text(
-            text = video.title,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            maxLines = 1,
+            text = remember(video.shortTitle, video.displaySubtitle, onBgColor) {
+                buildAnnotatedString {
+                    withStyle(titleStyle.copy(color = onBgColor, fontWeight = FontWeight.Medium)) {
+                        append(video.shortTitle)
+                    }
+                    append("\n")
+                    withStyle(subtitleStyle.copy(color = VideoOnSurfaceVariant)) {
+                        append(video.displaySubtitle)
+                    }
+                }
+            },
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            fontWeight = FontWeight.Medium,
+            lineHeight = 18.sp,
             modifier = Modifier
-                .padding(start = 8.dp, top = 6.dp, end = 8.dp)
-                .height(24.dp)
-        )
-        // 副标题：使用预计算的字符串
-        Text(
-            text = video.displaySubtitle,
-            style = MaterialTheme.typography.labelSmall,
-            color = VideoOnSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .padding(start = 10.dp, end = 8.dp)
-                .height(16.dp)
+                .padding(start = 8.dp, top = 4.dp)
+                .fillMaxWidth()
+                .height(40.dp) // 增加高度，确保两行文字都能显示
         )
     }
 }
@@ -307,14 +314,16 @@ private fun VideoCard(video: VideoItem, onClick: () -> Unit) {
 @Composable
 private fun ThumbnailPlaceholder(video: VideoItem) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    
+
     // 优化：显式指定 ImageRequest 的 size 和 precision，提升滑动时的响应速度
     val request = remember(video.thumbnailPath) {
         coil.request.ImageRequest.Builder(context)
             .data(video.thumbnailPath)
-            .crossfade(true)
-            .size(400, 300) // 根据 2 列网格的实际宽度估算
+            .crossfade(false)
+            .size(350, 200) // 根据 2 列网格的实际宽度估算
             .precision(coil.size.Precision.INEXACT) // 允许非精确匹配以提高加载速度
+            .memoryCacheKey(video.thumbnailPath)
+            .diskCacheKey(video.thumbnailPath)
             .build()
     }
 
@@ -339,12 +348,13 @@ private fun ThumbnailPlaceholder(video: VideoItem) {
             color = Color.White,
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
-            maxLines = 1,
+            maxLines = 1, textAlign = TextAlign.Center,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(6.dp)
+                .height(30.dp)
+                .width(56.dp)
+                .padding(0.dp, 0.dp, 8.dp, 6.dp)
                 .background(VideoControlBg, shape = BadgeShape)
-                .padding(horizontal = 5.dp, vertical = 1.dp) // 内部留白
         )
     }
 }

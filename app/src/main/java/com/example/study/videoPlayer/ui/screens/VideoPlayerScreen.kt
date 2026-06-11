@@ -9,12 +9,12 @@ import android.media.AudioManager
 import android.util.Log
 import android.view.Surface
 import android.view.TextureView
-import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,11 +59,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -711,22 +711,41 @@ private fun ProgressBar(
 ) {
     val totalMs = if (isPrepared && durationMs > 0) durationMs else fallbackDurationMs
     val progress = if (totalMs > 0) (currentPositionMs / totalMs).coerceIn(0f, 1f) else 0f
+    var isDragging by remember { mutableStateOf(false) }
+    var sliderProgress by remember { mutableFloatStateOf(progress) }
+
+    LaunchedEffect(progress, isDragging) {
+        if (!isDragging) {
+            sliderProgress = progress
+        }
+    }
+
+    val displayedPositionMs = if (isDragging) {
+        sliderProgress * totalMs
+    } else {
+        currentPositionMs
+    }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = formatTime(currentPositionMs.roundToLong()),
+            text = formatTime(displayedPositionMs.roundToLong()),
             color = Color.White.copy(alpha = 0.8f),
             fontSize = 12.sp,
             modifier = Modifier.width(44.dp),
             textAlign = TextAlign.Center
         )
         Slider(
-            value = progress,
+            value = sliderProgress,
             onValueChange = { newProgress ->
-                onSeek((newProgress * totalMs).roundToLong().toInt())
+                isDragging = true
+                sliderProgress = newProgress
+            },
+            onValueChangeFinished = {
+                isDragging = false
+                onSeek((sliderProgress * totalMs).roundToLong().toInt())
             },
             modifier = Modifier
                 .weight(1f)

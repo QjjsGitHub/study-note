@@ -57,6 +57,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private var currentSurface: Surface? = null
     private var progressJob: Job? = null
     private var controlsAutoHideJob: Job? = null
+    private var resumeWhenSurfaceReady = false
 
     init {
         setupMediaPlayer()
@@ -93,18 +94,34 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     // ── Surface 管理 ────────────────────────────────────────────────
 
     fun onSurfaceReady(surface: Surface, video: VideoItem) {
+        val isSamePreparedVideo = currentVideo?.id == video.id && isPrepared
         currentSurface = surface
         currentVideo = video
         surfaceReady = true
-        preparePlayer(video, surface)
+
+        if (isSamePreparedVideo) {
+            safeExecute {
+                mediaPlayer.setSurface(surface)
+                if (resumeWhenSurfaceReady) {
+                    mediaPlayer.start()
+                    isPlaying = true
+                    startProgressPolling()
+                }
+            }
+            resumeWhenSurfaceReady = false
+        } else {
+            preparePlayer(video, surface)
+        }
     }
 
     fun onSurfaceDestroyed() {
         stopProgressPolling()
+        resumeWhenSurfaceReady = isPlaying
         safeExecute {
             if (mediaPlayer.isPlaying) {
                 mediaPlayer.pause()
             }
+            mediaPlayer.setSurface(null)
         }
         isPlaying = false
         surfaceReady = false
@@ -211,6 +228,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             mediaPlayer.reset()
             isPrepared = false
             hasError = false
+            resumeWhenSurfaceReady = false
             stopProgressPolling()
 
             val uri = (video.thumbnailPath ?: "").toUri()
@@ -232,7 +250,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
                 safeExecute {
                     currentPositionMs = mediaPlayer.currentPosition.toFloat()
                 }
-                delay(200L.milliseconds) // 提高到 200ms 一次，让进度条更顺滑
+                delay(if (showControls) 250L.milliseconds else 1000L.milliseconds)
             }
         }
     }

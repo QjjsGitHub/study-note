@@ -41,5 +41,8 @@ data class VideoItem(
 
     /** 预计算副标题（分辨率 + 大小），减少 Composable 中的字符串拼接 */
     val displaySubtitle: String = "$resolution · $formattedSize"
+
+    /** 简短标题：限制长度防止合并显示时挤占副标题行空间 */
+    val shortTitle: String = if (title.length > 18) title.take(16) + "…" else title
 }
 
