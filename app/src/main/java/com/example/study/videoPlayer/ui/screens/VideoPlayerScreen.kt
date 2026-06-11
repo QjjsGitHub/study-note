@@ -4,11 +4,9 @@ import android.app.Activity
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
-import android.graphics.SurfaceTexture
 import android.media.AudioManager
-import android.util.Log
-import android.view.Surface
-import android.view.TextureView
+import android.view.SurfaceHolder
+import android.view.SurfaceView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -137,14 +135,14 @@ fun VideoPlayerScreen(
         audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, streamVol, 0)
     }
 
-    // ── 自动隐藏亮度 / 音量覆盖层 ──────────────────────────────
-    LaunchedEffect(viewModel.showBrightnessOverlay) {
+    // ── 自动隐藏亮度 / 音量覆盖层（滑动中重置计时器） ──────────────────────
+    LaunchedEffect(viewModel.showBrightnessOverlay, viewModel.brightness) {
         if (viewModel.showBrightnessOverlay) {
             delay(1500L.milliseconds)
             viewModel.showBrightnessOverlay = false
         }
     }
-    LaunchedEffect(viewModel.showVolumeOverlay) {
+    LaunchedEffect(viewModel.showVolumeOverlay, viewModel.volume) {
         if (viewModel.showVolumeOverlay) {
             delay(1500L.milliseconds)
             viewModel.showVolumeOverlay = false
@@ -185,7 +183,6 @@ fun VideoPlayerScreen(
             .fillMaxSize()
             .background(VideoBackground)
             .pointerInput(Unit) {
-                var lastUpdateMs = 0L
                 var accumulatedDrag = 0f
                 detectVerticalDragGestures(
                     onDragStart = { _ ->
@@ -196,31 +193,23 @@ fun VideoPlayerScreen(
                     onVerticalDrag = { change, dragAmount ->
                         change.consume()
                         accumulatedDrag += dragAmount
-                        val now = System.currentTimeMillis()
-                        if (now - lastUpdateMs >= 100) {
-                            lastUpdateMs = now
 
-                            val halfW = size.width.toFloat() / 2f
-                            val fraction = -accumulatedDrag / (size.height.toFloat() / 4f)
+                        val halfW = size.width.toFloat() / 2f
+                        val fraction = -accumulatedDrag / (size.height.toFloat() / 3f) // 适当降低调节灵敏度
 
-                            Log.d(
-                                "调节音量亮度",
-                                "$accumulatedDrag:$fraction"
+                        if (change.position.x < halfW) {
+                            // 左侧 — 亮度
+                            viewModel.updateBrightness(
+                                (dragStartBrightness + fraction).coerceIn(
+                                    0.01f,
+                                    1f
+                                )
                             )
-
-                            accumulatedDrag = 0f
-                            if (change.position.x < halfW) {
-                                // 左侧 — 亮度
-                                dragStartBrightness =
-                                    (dragStartBrightness + fraction).coerceIn(0.01f, 1f)
-                                viewModel.updateBrightness(dragStartBrightness)
-                                viewModel.showBrightnessOverlay = true
-                            } else {
-                                // 右侧 — 音量
-                                dragStartVolume = (dragStartVolume + fraction).coerceIn(0f, 1f)
-                                viewModel.updateVolume(dragStartVolume)
-                                viewModel.showVolumeOverlay = true
-                            }
+                            viewModel.showBrightnessOverlay = true
+                        } else {
+                            // 右侧 — 音量
+                            viewModel.updateVolume((dragStartVolume + fraction).coerceIn(0f, 1f))
+                            viewModel.showVolumeOverlay = true
                         }
                     },
                     onDragEnd = {},
@@ -283,31 +272,24 @@ fun VideoPlayerScreen(
 
             AndroidView(
                 factory = { ctx ->
-                    TextureView(ctx).apply {
-                        surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-                            override fun onSurfaceTextureAvailable(
-                                st: SurfaceTexture,
-                                width: Int,
-                                height: Int
-                            ) {
-                                val surface = Surface(st)
-                                viewModel.onSurfaceReady(surface, video)
+                    SurfaceView(ctx).apply {
+                        holder.addCallback(object : SurfaceHolder.Callback {
+                            override fun surfaceCreated(h: SurfaceHolder) {
+                                viewModel.onSurfaceReady(h.surface, video)
                             }
 
-                            override fun onSurfaceTextureSizeChanged(
-                                st: SurfaceTexture,
-                                width: Int,
-                                height: Int
+                            override fun surfaceChanged(
+                                h: SurfaceHolder,
+                                f: Int,
+                                w: Int,
+                                h1: Int
                             ) {
                             }
 
-                            override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
+                            override fun surfaceDestroyed(h: SurfaceHolder) {
                                 viewModel.onSurfaceDestroyed()
-                                return true
                             }
-
-                            override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
-                        }
+                        })
                     }
                 },
                 modifier = videoModifier.align(Alignment.Center),
