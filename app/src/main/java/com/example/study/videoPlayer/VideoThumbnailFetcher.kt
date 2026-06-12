@@ -35,7 +35,7 @@ class VideoThumbnailFetcher(
          * 限制全局并发缩略图生成的数量。
          * 设置为 3 可以确保不会在滑动时瞬间压死磁盘 IO 和解码器。
          */
-        private val semaphore = Semaphore(1)
+        private val semaphore = Semaphore(3)
     }
 
     override suspend fun fetch(): FetchResult = withContext(Dispatchers.IO) {
