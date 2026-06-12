@@ -1,17 +1,20 @@
 # ── Gradle ──
 .gradle/
 **/build/
-!**/src/**/build/
 
 # ── IDE (Android Studio) ──
 .idea/
 !.idea/codeStyles/
 !.idea/copyright/
 !.idea/runConfigurations/
+**/shelf/
+**/workspace.xml
 
 # ── Android ──
 *.apk
 *.aab
+*.aar
+*.apks
 *.dex
 *.ap_
 *.keystore

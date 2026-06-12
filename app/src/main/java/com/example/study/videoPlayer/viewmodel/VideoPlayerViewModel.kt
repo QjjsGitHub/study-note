@@ -151,9 +151,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         if (isPrepared) {
             safeExecute {
                 mediaPlayer.seekTo(seekMs)
+                currentPositionMs = seekMs.toFloat()
             }
         }
-        currentPositionMs = seekMs.toFloat()
     }
 
     fun skipBackward() {
@@ -234,8 +234,8 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             resumeWhenSurfaceReady = false
             stopProgressPolling()
 
-            val uri = (video.contentUri ?: "").toUri()
-            if (uri.scheme == "content") {
+            val uri = video.contentUri?.toUri()
+            if (uri?.scheme == "content") {
                 mediaPlayer.setDataSource(getApplication(), uri)
             } else {
                 mediaPlayer.setDataSource(video.filePath)

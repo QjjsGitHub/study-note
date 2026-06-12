@@ -107,8 +107,14 @@ fun VideoPlayerScreen(
     val viewModel: VideoPlayerViewModel =
         ViewModelProvider(viewModelStore)[VideoPlayerViewModel::class]
 
+    val activity: Activity
     // ─── 从系统读取初始亮度与音量 ───
-    val activity = context as Activity
+    try {
+        activity = context as Activity
+    } catch (_: Exception) {
+        return
+    }
+
     val audioManager = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
     val maxVolume = remember { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) }
 
@@ -204,13 +210,14 @@ fun VideoPlayerScreen(
                 detectTransformGestures { centroid, pan, zoom, rotation ->
                     // A. 计算多指状态或是否已处于变换状态
                     val isMultiTouch = zoom != 1f || rotation != 0f
-                    val isTransformed = Math.abs(videoScale - 1f) > 0.01f || Math.abs(videoRotation) > 0.5f
+                    val isTransformed =
+                        Math.abs(videoScale - 1f) > 0.01f || Math.abs(videoRotation) > 0.5f
 
                     if (isMultiTouch || isTransformed) {
                         // 变换模式：缩放、旋转、平移
                         videoScale = (videoScale * zoom).coerceIn(0.5f, 5f)
                         videoRotation += rotation
-                        
+
                         // 只有在放大或旋转后，平移才生效（或正在多指操作中）
                         if (videoScale > 1.01f || Math.abs(videoRotation) > 0.5f || isMultiTouch) {
                             videoOffset += pan
@@ -223,7 +230,12 @@ fun VideoPlayerScreen(
                         val fraction = -pan.y / (size.height.toFloat() / 3f)
                         if (centroid.x < size.width / 2) {
                             // 左侧 — 亮度
-                            viewModel.updateBrightness((viewModel.brightness + fraction).coerceIn(0.01f, 1f))
+                            viewModel.updateBrightness(
+                                (viewModel.brightness + fraction).coerceIn(
+                                    0.01f,
+                                    1f
+                                )
+                            )
                             viewModel.showBrightnessOverlay = true
                         } else {
                             // 右侧 — 音量
@@ -492,9 +504,9 @@ fun VideoPlayerScreen(
             ) {
                 // --- 还原按钮 ---
                 // 使用阈值判断，避免浮点数误差导致按钮无法消失
-                val isTransformed = Math.abs(videoScale - 1f) > 0.01f || 
-                                   Math.abs(videoRotation) > 0.5f || 
-                                   videoOffset != Offset.Zero
+                val isTransformed = Math.abs(videoScale - 1f) > 0.01f ||
+                        Math.abs(videoRotation) > 0.5f ||
+                        videoOffset != Offset.Zero
                 AnimatedVisibility(
                     visible = isTransformed,
                     enter = fadeIn(),
