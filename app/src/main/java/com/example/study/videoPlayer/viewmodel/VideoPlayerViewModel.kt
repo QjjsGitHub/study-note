@@ -119,7 +119,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun onSurfaceDestroyed() {
         stopProgressPolling()
-        resumeWhenSurfaceReady = isPlaying
+        // 使用 mediaPlayer.isPlaying 而非 isPlaying (Compose 状态)
+        // 因为 onPause 可能已经先把 isPlaying 设为了 false
+        resumeWhenSurfaceReady = mediaPlayer.isPlaying
         safeExecute {
             if (mediaPlayer.isPlaying) {
                 mediaPlayer.pause()
@@ -138,14 +140,15 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         if (!isPrepared) return
         safeExecute {
             if (isPlaying) {
+                isPlaying = false
                 mediaPlayer.pause()
                 stopProgressPolling()
             } else {
                 mediaPlayer.start()
+                isPlaying = true
                 startProgressPolling()
                 scheduleControlsAutoHide()
             }
-            isPlaying = !isPlaying
         }
     }
 
@@ -231,6 +234,19 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             safeExecute { mediaPlayer.pause() }
             isPlaying = false
             stopProgressPolling()
+        }
+    }
+
+    fun onResume() {
+        // Surface 已就绪 → 直接恢复
+        if (isPrepared && surfaceReady && !isPlaying) {
+            safeExecute {
+                startProgressPolling()
+                scheduleControlsAutoHide()
+            }
+            // Surface 尚未就绪 → 等 onSurfaceReady 恢复
+        } else if (isPrepared && !surfaceReady) {
+            resumeWhenSurfaceReady = true
         }
     }
 

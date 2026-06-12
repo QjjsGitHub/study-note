@@ -173,8 +173,10 @@ fun VideoPlayerScreen(
     // ── 生命周期处理 ──────────────────────────────────────────
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE) {
-                viewModel.onPause()
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> viewModel.onPause()
+                Lifecycle.Event.ON_RESUME -> viewModel.onResume()
+                else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
