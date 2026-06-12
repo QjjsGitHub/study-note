@@ -19,7 +19,6 @@ val VideoSecondary = Color(0xFF80CBC4)
 val VideoOnBackground = Color(0xFFE8E8E8)
 val VideoOnSurface = Color(0xFFD0D0D0)
 val VideoOnSurfaceVariant = Color(0xFF999999)
-val VideoAccent = Color(0xFFFF6D00)
 val VideoControlBg = Color(0xCC1A1A1A)
 
 private val VideoPlayerDarkColorScheme = darkColorScheme(
@@ -44,7 +43,7 @@ fun VideoPlayerTheme(
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as Activity).window
+            val window = (view.context as? Activity)?.window ?: return@SideEffect
             val insetsController = WindowCompat.getInsetsController(window, view)
             insetsController.isAppearanceLightStatusBars = false
             insetsController.isAppearanceLightNavigationBars = false

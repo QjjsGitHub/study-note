@@ -202,10 +202,21 @@ fun VideoListScreen(
                                     text = { Text("刷新列表") },
                                     onClick = { showMenu = false; onRefresh() }
                                 )
-                                DropdownMenuItem(
-                                    text = { Text("排序方式") },
-                                    onClick = { showMenu = false }
-                                )
+                                VideoListViewModel.SortMode.entries.forEach { mode ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = mode.label,
+                                                fontWeight = if (mode == viewModel.sortMode) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (mode == viewModel.sortMode) VideoPrimary else Color.Unspecified
+                                            )
+                                        },
+                                        onClick = {
+                                            showMenu = false
+                                            viewModel.updateSortMode(mode)
+                                        }
+                                    )
+                                }
                                 DropdownMenuItem(
                                     text = { Text("扫描目录") },
                                     onClick = { showMenu = false; onScan() }

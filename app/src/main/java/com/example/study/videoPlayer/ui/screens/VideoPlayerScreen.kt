@@ -90,6 +90,7 @@ import com.example.study.videoPlayer.model.VideoItem
 import com.example.study.videoPlayer.ui.theme.VideoBackground
 import com.example.study.videoPlayer.ui.theme.VideoControlBg
 import com.example.study.videoPlayer.ui.theme.VideoPrimary
+import com.example.study.videoPlayer.util.formatTime
 import com.example.study.videoPlayer.viewmodel.VideoPlayerViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.conflate
@@ -837,20 +838,5 @@ private fun ProgressBar(
             modifier = Modifier.width(44.dp),
             textAlign = TextAlign.Center
         )
-    }
-}
-
-/**
- * 格式化毫秒为 mm:ss 或 hh:mm:ss
- */
-private fun formatTime(ms: Long): String {
-    val totalSeconds = ms / 1000
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
-    val seconds = totalSeconds % 60
-    return if (hours > 0) {
-        "%d:%02d:%02d".format(hours, minutes, seconds)
-    } else {
-        "%02d:%02d".format(minutes, seconds)
     }
 }

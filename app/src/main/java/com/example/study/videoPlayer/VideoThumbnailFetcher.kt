@@ -52,7 +52,15 @@ class VideoThumbnailFetcher(
                     null
                 }
             } else {
-                // Android Q 以下的兼容处理
+                // ── Android Q 以下：ThumbnailUtils 需要文件路径 ──────────
+                // 在 Android 10 之前，ContentResolver 没有 loadThumbnail()，
+                // 只能使用 ThumbnailUtils.createVideoThumbnail()。
+                // 但后者只接受文件路径，不接受 content URI。
+                // 所以需要先通过 getPathFromUri() 把 content URI 转成文件路径。
+                // 这是唯一的兼容方式，虽然多一次查询但仅在旧设备上触发。
+                //
+                // 另注意 ThumbnailUtils.createVideoThumbnail() 在 API 29 标记为
+                // @Deprecated，因为官方推荐使用 loadThumbnail() 替代。
                 @Suppress("DEPRECATION")
                 android.media.ThumbnailUtils.createVideoThumbnail(
                     getPathFromUri(uri) ?: "",

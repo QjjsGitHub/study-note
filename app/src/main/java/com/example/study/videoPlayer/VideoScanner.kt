@@ -17,12 +17,16 @@ object VideoScanner {
         add(MediaStore.Video.Media.DATA)
         add(MediaStore.Video.Media.DURATION)
         add(MediaStore.Video.Media.SIZE)
+        add(MediaStore.Video.Media.DATE_MODIFIED)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             add(MediaStore.Video.Media.WIDTH)
             add(MediaStore.Video.Media.HEIGHT)
             add(MediaStore.Video.Media.ORIENTATION)
         } else {
+            // Android 9 以下 MediaStore.Video.Media.WIDTH/HEIGHT 常量不可用，
+            // 但底层的 sqlite 列名 "width"/"height" 自 Android 1.0 起一直存在且稳定，
+            // 直接使用字符串是安全的。
             add("width")
             add("height")
         }
@@ -51,6 +55,7 @@ object VideoScanner {
             val dataColumn = it.getColumnIndexOrThrow(MediaStore.Video.Media.DATA)
             val durationColumn = it.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
             val sizeColumn = it.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
+            val dateModifiedColumn = it.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_MODIFIED)
             val widthColumn = it.getColumnIndex("width")
             val heightColumn = it.getColumnIndex("height")
             val orientationColumn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -89,6 +94,7 @@ object VideoScanner {
                         filePath = filePath,
                         durationMs = durationMs,
                         fileSizeBytes = fileSizeBytes,
+                        dateModified = it.getLong(dateModifiedColumn),
                         width = width,
                         height = height,
                         resolution = resolution,

@@ -1,5 +1,7 @@
 package com.example.study.videoPlayer.model
 
+import com.example.study.videoPlayer.util.formatTime
+
 /**
  * 本地视频数据模型
  */
@@ -9,6 +11,7 @@ data class VideoItem(
     val filePath: String,
     val durationMs: Long,
     val fileSizeBytes: Long,
+    val dateModified: Long = 0L,
     val width: Int = 0,
     val height: Int = 0,
     val resolution: String = "未知",
@@ -16,17 +19,7 @@ data class VideoItem(
     val contentUri: String? = null
 ) {
     /** 格式化时长，如 "01:23:45" 或 "12:34"（构造时预计算，避免滚动中重复算） */
-    val formattedDuration: String = run {
-        val totalSeconds = durationMs / 1000
-        val hours = totalSeconds / 3600
-        val minutes = (totalSeconds % 3600) / 60
-        val seconds = totalSeconds % 60
-        if (hours > 0) {
-            "%02d:%02d:%02d".format(hours, minutes, seconds)
-        } else {
-            "%02d:%02d".format(minutes, seconds)
-        }
-    }
+    val formattedDuration: String = formatTime(durationMs)
 
     /** 格式化文件大小（构造时预计算） */
     val formattedSize: String = run {

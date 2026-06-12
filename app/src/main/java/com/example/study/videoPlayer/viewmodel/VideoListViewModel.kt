@@ -36,6 +36,28 @@ class VideoListViewModel(application: Application) : AndroidViewModel(applicatio
     var hasScanned by mutableStateOf(false)
         private set
 
+    // ── 排序状态 ────────────────────────────────────────────────────
+
+    enum class SortMode(val label: String) {
+        NAME("按名称排序"),
+        DATE("按日期排序"),
+        SIZE("按大小排序"),
+        DURATION("按时长排序")
+    }
+
+    var sortMode by mutableStateOf(SortMode.DATE)
+        private set
+
+    /** 排序后的视频列表 */
+    private fun List<VideoItem>.sortedByMode(): List<VideoItem> {
+        return when (sortMode) {
+            SortMode.NAME -> sortedBy { it.title }
+            SortMode.DATE -> sortedByDescending { it.dateModified }
+            SortMode.SIZE -> sortedByDescending { it.fileSizeBytes }
+            SortMode.DURATION -> sortedByDescending { it.durationMs }
+        }
+    }
+
     // ── 搜索状态 ────────────────────────────────────────────────────
     var isSearchActive by mutableStateOf(false)
         private set
@@ -48,20 +70,24 @@ class VideoListViewModel(application: Application) : AndroidViewModel(applicatio
     var debouncedQuery by mutableStateOf("")
         private set
 
-    /** 按搜索内容过滤的视频列表（多关键词空格分隔，AND 逻辑） */
+    /** 按搜索内容过滤、按 sortMode 排序的视频列表（多关键词空格分隔，AND 逻辑） */
     val filteredVideoList: List<VideoItem>
         get() {
             val query = debouncedQuery.trim()
-            if (query.isEmpty()) return videoList
-            val keywords = query.split("\\s+".toRegex()).filter { it.isNotEmpty() }
-            if (keywords.isEmpty()) return videoList
-            return videoList.filter { video ->
-                keywords.all { keyword ->
-                    video.title.contains(keyword, ignoreCase = true) ||
-                            video.filePath.contains(keyword, ignoreCase = true) ||
-                            video.resolution.contains(keyword, ignoreCase = true)
+            val filtered = if (query.isEmpty()) {
+                videoList
+            } else {
+                val keywords = query.split("\\s+".toRegex()).filter { it.isNotEmpty() }
+                if (keywords.isEmpty()) videoList
+                else videoList.filter { video ->
+                    keywords.all { keyword ->
+                        video.title.contains(keyword, ignoreCase = true) ||
+                                video.filePath.contains(keyword, ignoreCase = true) ||
+                                video.resolution.contains(keyword, ignoreCase = true)
+                    }
                 }
             }
+            return filtered.sortedByMode()
         }
 
     // ── 防抖 Job
@@ -102,6 +128,10 @@ class VideoListViewModel(application: Application) : AndroidViewModel(applicatio
             delay(200L.milliseconds)
             debouncedQuery = query
         }
+    }
+
+    fun updateSortMode(mode: SortMode) {
+        sortMode = mode
     }
 
     /** 扫描本地视频。调用前需确保已获得存储权限。 */
