@@ -60,7 +60,6 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private var currentSurface: Surface? = null
     private var progressJob: Job? = null
     private var controlsAutoHideJob: Job? = null
-    private var resumeWhenSurfaceReady = false
 
     init {
         setupMediaPlayer()
@@ -105,13 +104,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         if (isSamePreparedVideo) {
             safeExecute {
                 mediaPlayer.setSurface(surface)
-                if (resumeWhenSurfaceReady) {
-                    mediaPlayer.start()
-                    isPlaying = true
-                    startProgressPolling()
-                }
             }
-            resumeWhenSurfaceReady = false
         } else {
             preparePlayer(video, surface)
         }
@@ -119,9 +112,6 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun onSurfaceDestroyed() {
         stopProgressPolling()
-        // 使用 mediaPlayer.isPlaying 而非 isPlaying (Compose 状态)
-        // 因为 onPause 可能已经先把 isPlaying 设为了 false
-        resumeWhenSurfaceReady = mediaPlayer.isPlaying
         safeExecute {
             if (mediaPlayer.isPlaying) {
                 mediaPlayer.pause()
@@ -191,11 +181,15 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun toggleControls() {
         showControls = !showControls
-        if (showControls) scheduleControlsAutoHide()
+        if (showControls) {
+            refreshPosition()
+            scheduleControlsAutoHide()
+        }
     }
 
     fun showControls() {
         showControls = true
+        refreshPosition()
         scheduleControlsAutoHide()
     }
 
@@ -237,19 +231,6 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
-    fun onResume() {
-        // Surface 已就绪 → 直接恢复
-        if (isPrepared && surfaceReady && !isPlaying) {
-            safeExecute {
-                startProgressPolling()
-                scheduleControlsAutoHide()
-            }
-            // Surface 尚未就绪 → 等 onSurfaceReady 恢复
-        } else if (isPrepared && !surfaceReady) {
-            resumeWhenSurfaceReady = true
-        }
-    }
-
     override fun onCleared() {
         super.onCleared()
         stopProgressPolling()
@@ -265,7 +246,6 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             mediaPlayer.reset()
             isPrepared = false
             hasError = false
-            resumeWhenSurfaceReady = false
             stopProgressPolling()
 
             val uri = video.contentUri?.toUri()
@@ -318,6 +298,15 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
             action()
         } catch (e: Exception) {
             Log.e("VideoPlayerVM", "MediaPlayer Error", e)
+        }
+    }
+
+    /** 立即从 MediaPlayer 读取最新播放进度 */
+    private fun refreshPosition() {
+        if (isPrepared) {
+            safeExecute {
+                currentPositionMs = mediaPlayer.currentPosition.toFloat()
+            }
         }
     }
 }
