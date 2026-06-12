@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.BrightnessHigh
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -711,7 +712,12 @@ fun VideoPlayerScreen(
                     .background(VideoControlBg)
                     .padding(12.dp)
             ) {
-                Text(text = "☀️", fontSize = 24.sp)
+                Icon(
+                    imageVector = Icons.Default.BrightnessHigh,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "亮度",
@@ -778,10 +784,8 @@ private fun ProgressBar(
     var isDragging by remember { mutableStateOf(false) }
     var sliderProgress by remember { mutableFloatStateOf(progress) }
 
-    LaunchedEffect(progress, isDragging) {
-        if (!isDragging) {
-            sliderProgress = progress
-        }
+    if (!isDragging) {
+        sliderProgress = progress
     }
 
     val displayedPositionMs = if (isDragging) {
