@@ -44,7 +44,9 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         private set
     var showSpeedMenu by mutableStateOf(false)
     var showBrightnessOverlay by mutableStateOf(false)
+        private set
     var showVolumeOverlay by mutableStateOf(false)
+        private set
 
     // ── 亮度 / 音量（由 composable 同步到系统） ──────────────────────
     var brightness by mutableFloatStateOf(0.5f)
@@ -196,6 +198,22 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun dismissSpeedMenu() {
         showSpeedMenu = false
+    }
+
+    fun showBrightnessAdjusting() {
+        showBrightnessOverlay = true
+    }
+
+    fun dismissBrightnessOverlay() {
+        showBrightnessOverlay = false
+    }
+
+    fun showVolumeAdjusting() {
+        showVolumeOverlay = true
+    }
+
+    fun dismissVolumeOverlay() {
+        showVolumeOverlay = false
     }
 
     fun updateBrightness(value: Float) {

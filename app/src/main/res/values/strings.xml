@@ -159,4 +159,19 @@
     <string name="title_activity_data">DataActivity</string>
     <string name="title_activity_work_manager">WorkManagerActivity</string>
     <string name="title_activity_flow">FlowActivity</string>
+
+    <!-- VideoPlayer -->
+    <string name="video_back">返回</string>
+    <string name="video_more">更多</string>
+    <string name="video_play">播放</string>
+    <string name="video_pause">暂停</string>
+    <string name="video_rewind">后退10秒</string>
+    <string name="video_forward">前进10秒</string>
+    <string name="video_fullscreen">全屏</string>
+    <string name="video_playback_speed">播放速度</string>
+    <string name="video_play_error">无法播放此视频</string>
+    <string name="video_reset_hint">还原画面</string>
+    <string name="video_brightness">亮度</string>
+    <string name="video_volume">音量</string>
+    <string name="video_seconds">10</string>
 </resources>

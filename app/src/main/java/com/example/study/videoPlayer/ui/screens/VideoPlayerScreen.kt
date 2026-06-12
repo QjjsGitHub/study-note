@@ -73,6 +73,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -84,6 +85,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import com.example.study.R
 import com.example.study.videoPlayer.model.VideoItem
 import com.example.study.videoPlayer.ui.theme.VideoBackground
 import com.example.study.videoPlayer.ui.theme.VideoControlBg
@@ -158,13 +160,13 @@ fun VideoPlayerScreen(
     LaunchedEffect(viewModel.showBrightnessOverlay, viewModel.brightness) {
         if (viewModel.showBrightnessOverlay) {
             delay(1500L.milliseconds)
-            viewModel.showBrightnessOverlay = false
+            viewModel.dismissBrightnessOverlay()
         }
     }
     LaunchedEffect(viewModel.showVolumeOverlay, viewModel.volume) {
         if (viewModel.showVolumeOverlay) {
             delay(1500L.milliseconds)
-            viewModel.showVolumeOverlay = false
+            viewModel.dismissVolumeOverlay()
         }
     }
 
@@ -237,11 +239,11 @@ fun VideoPlayerScreen(
                                     1f
                                 )
                             )
-                            viewModel.showBrightnessOverlay = true
+                            viewModel.showBrightnessAdjusting()
                         } else {
                             // 右侧 — 音量
                             viewModel.updateVolume((viewModel.volume + fraction).coerceIn(0f, 1f))
-                            viewModel.showVolumeOverlay = true
+                            viewModel.showVolumeAdjusting()
                         }
                     }
                 }
@@ -271,7 +273,7 @@ fun VideoPlayerScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "无法播放此视频",
+                        text = stringResource(R.string.video_play_error),
                         color = Color.White.copy(alpha = 0.3f),
                         fontSize = 13.sp
                     )
@@ -388,7 +390,7 @@ fun VideoPlayerScreen(
             ) {
                 Icon(
                     imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (viewModel.isPlaying) "暂停" else "播放",
+                    contentDescription = if (viewModel.isPlaying) stringResource(R.string.video_pause) else stringResource(R.string.video_play),
                     tint = VideoBackground,
                     modifier = Modifier.size(36.dp)
                 )
@@ -445,7 +447,7 @@ fun VideoPlayerScreen(
                     IconButton(onClick = onBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
+                            contentDescription = stringResource(R.string.video_back),
                             tint = Color.White
                         )
                     }
@@ -454,7 +456,7 @@ fun VideoPlayerScreen(
                     IconButton(onClick = { }) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,
-                            contentDescription = "更多",
+                            contentDescription = stringResource(R.string.video_more),
                             tint = Color.White
                         )
                     }
@@ -529,13 +531,13 @@ fun VideoPlayerScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Default.Refresh,
-                                contentDescription = "还原画面",
+                                contentDescription = stringResource(R.string.video_reset_hint),
                                 tint = Color.White,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "还原画面",
+                                text = stringResource(R.string.video_reset_hint),
                                 color = Color.White,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium
@@ -573,7 +575,7 @@ fun VideoPlayerScreen(
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(
                                     imageVector = Icons.Default.Speed,
-                                    contentDescription = "播放速度",
+                                    contentDescription = stringResource(R.string.video_playback_speed),
                                     tint = Color.White,
                                     modifier = Modifier.size(24.dp)
                                 )
@@ -617,12 +619,12 @@ fun VideoPlayerScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
                                 imageVector = Icons.Default.FastRewind,
-                                contentDescription = "后退10秒",
+                                contentDescription = stringResource(R.string.video_rewind),
                                 tint = Color.White,
                                 modifier = Modifier.size(28.dp)
                             )
                             Text(
-                                text = "10",
+                                text = stringResource(R.string.video_seconds),
                                 color = Color.White.copy(alpha = 0.7f),
                                 fontSize = 9.sp
                             )
@@ -642,7 +644,7 @@ fun VideoPlayerScreen(
                     ) {
                         Icon(
                             imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (viewModel.isPlaying) "暂停" else "播放",
+                            contentDescription = if (viewModel.isPlaying) stringResource(R.string.video_pause) else stringResource(R.string.video_play),
                             tint = Color(0xFF003544),
                             modifier = Modifier.size(32.dp)
                         )
@@ -659,12 +661,12 @@ fun VideoPlayerScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
                                 imageVector = Icons.Default.FastForward,
-                                contentDescription = "前进10秒",
+                                contentDescription = stringResource(R.string.video_forward),
                                 tint = Color.White,
                                 modifier = Modifier.size(28.dp)
                             )
                             Text(
-                                text = "10",
+                                text = stringResource(R.string.video_seconds),
                                 color = Color.White.copy(alpha = 0.7f),
                                 fontSize = 9.sp
                             )
@@ -686,7 +688,7 @@ fun VideoPlayerScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Fullscreen,
-                            contentDescription = "全屏",
+                            contentDescription = stringResource(R.string.video_fullscreen),
                             tint = Color.White,
                             modifier = Modifier.size(24.dp)
                         )
@@ -720,7 +722,7 @@ fun VideoPlayerScreen(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "亮度",
+                    text = stringResource(R.string.video_brightness),
                     color = Color.White,
                     fontSize = 12.sp
                 )
@@ -756,7 +758,7 @@ fun VideoPlayerScreen(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "音量",
+                    text = stringResource(R.string.video_volume),
                     color = Color.White,
                     fontSize = 12.sp
                 )
@@ -782,7 +784,7 @@ private fun ProgressBar(
     val totalMs = if (isPrepared && durationMs > 0) durationMs else fallbackDurationMs
     val progress = if (totalMs > 0) (currentPositionMs / totalMs).coerceIn(0f, 1f) else 0f
     var isDragging by remember { mutableStateOf(false) }
-    var sliderProgress by remember { mutableFloatStateOf(progress) }
+    var sliderProgress by remember { mutableFloatStateOf(0f) }
 
     if (!isDragging) {
         sliderProgress = progress
