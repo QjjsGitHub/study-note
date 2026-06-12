@@ -88,7 +88,7 @@ class GalleryFragment : Fragment() {
         super.onResume()
         Log.d(
             MainActivity.KOTLIN_FRAGMENT_AND_ACTIVITY_LIFE,
-            "Thread: " + Thread.currentThread().id.toString()
+            "Thread: " + Thread.currentThread().name
         )
         Log.d(
             MainActivity.KOTLIN_FRAGMENT_AND_ACTIVITY_LIFE, javaClass.name.substring

@@ -90,19 +90,19 @@ class FirstFragment : Fragment() {
                             }
                             Log.d(
                                 InternetActivity.INTERNET_ACTIVITY_TAG, "onError Thread id: " +
-                                        Thread.currentThread().id
+                                        Thread.currentThread().name
                             )
                         }
                         Log.d(
                             InternetActivity.INTERNET_ACTIVITY_TAG, "onNext Thread id: " +
-                                    Thread.currentThread().id
+                                    Thread.currentThread().name
                         )
                         e.onNext(i)
                     }
                 }
                 Log.d(
                     InternetActivity.INTERNET_ACTIVITY_TAG, "onComplete Thread id: " +
-                            Thread.currentThread().id
+                            Thread.currentThread().name
                 )
 
                 e.onComplete()
@@ -112,7 +112,7 @@ class FirstFragment : Fragment() {
             override fun onNext(value: Int) {
                 Log.d(
                     InternetActivity.INTERNET_ACTIVITY_TAG,
-                    "onNext=" + value + " Thread id:" + Thread.currentThread().id
+                    "onNext=" + value + " Thread id:" + Thread.currentThread().name
                 )
                 binding.textviewFirst.setText("Current Progress=" + value)
             }
@@ -120,7 +120,7 @@ class FirstFragment : Fragment() {
             override fun onError(e: Throwable) {
                 Log.d(
                     InternetActivity.INTERNET_ACTIVITY_TAG,
-                    "onError=" + e + " Thread id:" + Thread.currentThread().id
+                    "onError=" + e + " Thread id:" + Thread.currentThread().name
                 )
                 binding.textviewFirst.setText("Download Error")
             }
@@ -128,7 +128,7 @@ class FirstFragment : Fragment() {
             override fun onComplete() {
                 Log.d(
                     InternetActivity.INTERNET_ACTIVITY_TAG,
-                    "onComplete" + " Thread id:" + Thread.currentThread().id
+                    "onComplete" + " Thread id:" + Thread.currentThread().name
                 )
                 binding.textviewFirst.setText("Download onComplete")
             }
@@ -206,17 +206,14 @@ class FirstFragment : Fragment() {
         val viewModel = ViewModelProvider(this).get(UserViewModel::class.java)
 
         binding.button32.setOnClickListener {
-            it
             viewModel.loadUsers(apiService)
         }
 
         binding.button41.setOnClickListener {
-            it
             getData()
         }
 
         binding.button42.setOnClickListener {
-            it
             getDataOnLocal()
         }
 
@@ -237,7 +234,7 @@ class FirstFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        mCompositeDisposable.clear();
+        mCompositeDisposable.clear()
         _binding = null
     }
 }

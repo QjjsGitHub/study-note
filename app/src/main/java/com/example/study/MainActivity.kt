@@ -1,6 +1,5 @@
 package com.example.study
 
-import android.app.ActivityManager
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -32,7 +31,7 @@ class MainActivity : AppCompatActivity() {
 
         Log.d(
             "ActivityLife",
-            "Thread:" + Thread.currentThread().id.toString() + "  " + javaClass.name + "onCreate"
+            "Thread:" + Thread.currentThread().name + "  " + javaClass.name + "onCreate"
         )
 
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -74,7 +73,7 @@ class MainActivity : AppCompatActivity() {
         navView.setupWithNavController(navController)
 
         Log.d("ActivityLife",
-            "Thread:" + Thread.currentThread().id.toString() + "  " +javaClass.name + "onCreateOver")
+            "Thread:" + Thread.currentThread().name + "  " +javaClass.name + "onCreateOver")
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -90,51 +89,51 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         Log.d("ActivityLife",
-            "Thread:" + Thread.currentThread().id.toString() + "  " +javaClass.name + "onStart")
+            "Thread:" + Thread.currentThread().name + "  " +javaClass.name + "onStart")
         super.onStart()
         Tools.getInstance().getTaskInfo(WeakReference(this))
         Log.d("ActivityLife",
-            "Thread:" + Thread.currentThread().id.toString() + "  " +javaClass.name + "onStartOver")
+            "Thread:" + Thread.currentThread().name + "  " +javaClass.name + "onStartOver")
     }
 
     override fun onNewIntent(intent: Intent) {
         Log.d("ActivityLife",
-            "Thread:" + Thread.currentThread().id.toString() + "  " +javaClass.name + "onNewIntent")
+            "Thread:" + Thread.currentThread().name + "  " +javaClass.name + "onNewIntent")
         super.onNewIntent(intent)
         Log.d("ActivityLife",
-            "Thread:" + Thread.currentThread().id.toString() + "  " +javaClass.name + "onNewIntentOver")
+            "Thread:" + Thread.currentThread().name + "  " +javaClass.name + "onNewIntentOver")
     }
 
     override fun onRestart() {
         Log.d("ActivityLife",
-            "Thread:" + Thread.currentThread().id.toString() + "  " +javaClass.name + "onRestart")
+            "Thread:" + Thread.currentThread().name + "  " +javaClass.name + "onRestart")
         super.onRestart()
         Log.d("ActivityLife",
-            "Thread:" + Thread.currentThread().id.toString() + "  " +javaClass.name + "onRestartOver")
+            "Thread:" + Thread.currentThread().name + "  " +javaClass.name + "onRestartOver")
     }
 
     override fun onResume() {
         Log.d("ActivityLife",
-            "Thread:" + Thread.currentThread().id.toString() + "  " +javaClass.name + "onResume")
+            "Thread:" + Thread.currentThread().name + "  " +javaClass.name + "onResume")
         super.onResume()
         Log.d("ActivityLife",
-            "Thread:" + Thread.currentThread().id.toString() + "  " +javaClass.name + "onResumeOver")
+            "Thread:" + Thread.currentThread().name + "  " +javaClass.name + "onResumeOver")
     }
 
     override fun onPause() {
         Log.d("ActivityLife",
-            "Thread:" + Thread.currentThread().id.toString() + "  " +javaClass.name + "onPause")
+            "Thread:" + Thread.currentThread().name + "  " +javaClass.name + "onPause")
         super.onPause()
         Log.d("ActivityLife",
-            "Thread:" + Thread.currentThread().id.toString() + "  " +javaClass.name + "onPauseOver")
+            "Thread:" + Thread.currentThread().name + "  " +javaClass.name + "onPauseOver")
     }
 
     override fun onStop() {
         Log.d("ActivityLife",
-            "Thread:" + Thread.currentThread().id.toString() + "  " +javaClass.name + "onStop")
+            "Thread:" + Thread.currentThread().name + "  " +javaClass.name + "onStop")
         super.onStop()
         Log.d("ActivityLife",
-            "Thread:" + Thread.currentThread().id.toString() + "  " +javaClass.name + "onStopOver")
+            "Thread:" + Thread.currentThread().name + "  " +javaClass.name + "onStopOver")
     }
 
 

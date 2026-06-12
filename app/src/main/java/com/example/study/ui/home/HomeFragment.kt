@@ -50,7 +50,7 @@ class HomeFragment : Fragment() {
             input.length
         }
 
-        var a: Int = stringLengthFunc("11");
+        var a: Int = stringLengthFunc("11")
 
         /*val homeViewModel =
             ViewModelProvider(this).get(HomeViewModel::class.java)*/
@@ -296,7 +296,7 @@ class HomeFragment : Fragment() {
         _binding = null
         Log.d(
             MainActivity.KOTLIN_FRAGMENT_AND_ACTIVITY_LIFE,
-            "Thread: " + Thread.currentThread().id.toString()
+            "Thread: " + Thread.currentThread().name
         )
         Log.d(
             MainActivity.KOTLIN_FRAGMENT_AND_ACTIVITY_LIFE, javaClass.name.substring

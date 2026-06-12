@@ -85,9 +85,9 @@ dependencies {
 
 
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
 
-
+    // 引入 BOM 指南
     implementation(platform(libs.androidx.compose.bom))
 
     implementation(libs.androidx.ui)
