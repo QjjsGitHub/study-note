@@ -34,76 +34,55 @@ object VideoScanner {
 
     private const val SORT_ORDER = "${MediaStore.Video.Media.DATE_MODIFIED} DESC"
 
-    /**
-     * 扫描设备上的所有本地视频
-     */
     fun scanAllVideos(contentResolver: ContentResolver): List<VideoItem> {
         val videos = mutableListOf<VideoItem>()
-        val uri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-
-        val cursor = contentResolver.query(
-            uri,
+        contentResolver.query(
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
             VIDEO_PROJECTION,
             null,
             null,
             SORT_ORDER
-        )
-
-        cursor?.use {
-            val idColumn = it.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
-            val titleColumn = it.getColumnIndexOrThrow(MediaStore.Video.Media.TITLE)
-            val dataColumn = it.getColumnIndexOrThrow(MediaStore.Video.Media.DATA)
-            val durationColumn = it.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
-            val sizeColumn = it.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
-            val dateModifiedColumn = it.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_MODIFIED)
-            val widthColumn = it.getColumnIndex("width")
-            val heightColumn = it.getColumnIndex("height")
-            val orientationColumn = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                it.getColumnIndex(MediaStore.Video.Media.ORIENTATION)
+        )?.use { cursor ->
+            val idCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+            val titleCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.TITLE)
+            val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATA)
+            val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
+            val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
+            val dateCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_MODIFIED)
+            val widthCol = cursor.getColumnIndex("width")
+            val heightCol = cursor.getColumnIndex("height")
+            val orientCol = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                cursor.getColumnIndex(MediaStore.Video.Media.ORIENTATION)
             } else -1
 
-            while (it.moveToNext()) {
-                val id = it.getLong(idColumn)
-                val title = it.getString(titleColumn) ?: "未知视频"
-                val filePath = it.getString(dataColumn) ?: continue
-                val durationMs = it.getLong(durationColumn)
-                val fileSizeBytes = it.getLong(sizeColumn)
-                var width = if (widthColumn >= 0) it.getInt(widthColumn) else 0
-                var height = if (heightColumn >= 0) it.getInt(heightColumn) else 0
-                val orientation = if (orientationColumn >= 0) it.getInt(orientationColumn) else 0
+            while (cursor.moveToNext()) {
+                val id = cursor.getLong(idCol)
+                var width = if (widthCol >= 0) cursor.getInt(widthCol) else 0
+                var height = if (heightCol >= 0) cursor.getInt(heightCol) else 0
+                val orientation = if (orientCol >= 0) cursor.getInt(orientCol) else 0
 
-                // 如果有旋转信息，交换宽高
                 if (orientation == 90 || orientation == 270) {
                     val temp = width
                     width = height
                     height = temp
                 }
 
-                // 构建视频内容 URI
-                val contentUri = Uri.withAppendedPath(
-                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                    id.toString()
-                )
-
-                val resolution = if (width > 0 && height > 0) "${width}×${height}" else "未知"
-
                 videos.add(
                     VideoItem(
                         id = id,
-                        title = title,
-                        filePath = filePath,
-                        durationMs = durationMs,
-                        fileSizeBytes = fileSizeBytes,
-                        dateModified = it.getLong(dateModifiedColumn),
+                        title = cursor.getString(titleCol) ?: "未知视频",
+                        filePath = cursor.getString(dataCol) ?: continue,
+                        durationMs = cursor.getLong(durationCol),
+                        fileSizeBytes = cursor.getLong(sizeCol),
+                        dateModified = cursor.getLong(dateCol),
                         width = width,
                         height = height,
-                        resolution = resolution,
-                        contentUri = contentUri.toString()
+                        resolution = if (width > 0 && height > 0) "${width}×${height}" else "未知",
+                        contentUri = Uri.withAppendedPath(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id.toString()).toString()
                     )
                 )
             }
         }
-
         return videos
     }
 }
