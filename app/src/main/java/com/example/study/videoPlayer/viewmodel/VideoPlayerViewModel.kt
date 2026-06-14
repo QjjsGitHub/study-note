@@ -173,6 +173,11 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
         if (isPrepared) {
             safeExecute {
                 mediaPlayer.playbackParams = mediaPlayer.playbackParams.setSpeed(speed)
+                // 某些 Android 版本在设置 playbackParams 时会隐式调用 start()，
+                // 如果视频原本是暂停状态，需要重新暂停以保持状态一致。
+                if (!isPlaying) {
+                    mediaPlayer.pause()
+                }
             }
         }
     }
