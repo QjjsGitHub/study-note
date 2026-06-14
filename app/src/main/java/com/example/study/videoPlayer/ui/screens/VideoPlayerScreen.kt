@@ -113,10 +113,10 @@ fun VideoPlayerScreen(
         return
     }
 
-    val audioManager = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     val maxVolume = remember { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) }
 
-    val originalBrightness = remember { activity.window.attributes.screenBrightness }
+    val originalBrightness = activity.window.attributes.screenBrightness
 
     // ── 亮度/音量初始化 + 持续同步（合并为单一 LaunchedEffect 减少首次组合开销） ──
     LaunchedEffect(Unit) {
@@ -152,13 +152,13 @@ fun VideoPlayerScreen(
     }
 
     // ── 自动隐藏亮度 / 音量覆盖层（滑动中重置计时器） ──────────────────────
-    LaunchedEffect(viewModel.showBrightnessOverlay, viewModel.brightness) {
+    LaunchedEffect(viewModel.showBrightnessOverlay) {
         if (viewModel.showBrightnessOverlay) {
             delay(1500L.milliseconds)
             viewModel.dismissBrightnessOverlay()
         }
     }
-    LaunchedEffect(viewModel.showVolumeOverlay, viewModel.volume) {
+    LaunchedEffect(viewModel.showVolumeOverlay) {
         if (viewModel.showVolumeOverlay) {
             delay(1500L.milliseconds)
             viewModel.dismissVolumeOverlay()
@@ -333,7 +333,7 @@ fun VideoPlayerScreen(
                     ),
             )
 
-            // 加载中指示
+            /*// 加载中指示
             if (!viewModel.isPrepared) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -362,7 +362,8 @@ fun VideoPlayerScreen(
                         )
                     }
                 }
-            }
+            }*/
+
         }
 
         // 中央大播放/暂停按钮（暂停或控件隐藏时显示）
@@ -385,7 +386,9 @@ fun VideoPlayerScreen(
             ) {
                 Icon(
                     imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (viewModel.isPlaying) stringResource(R.string.video_pause) else stringResource(R.string.video_play),
+                    contentDescription = if (viewModel.isPlaying) stringResource(R.string.video_pause) else stringResource(
+                        R.string.video_play
+                    ),
                     tint = VideoBackground,
                     modifier = Modifier.size(36.dp)
                 )
@@ -396,30 +399,22 @@ fun VideoPlayerScreen(
         AnimatedVisibility(
             visible = viewModel.showControls,
             enter = fadeIn(),
-            exit = fadeOut()
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .height(120.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Black.copy(alpha = 0.7f),
-                                Color.Transparent
-                            )
+            exit = fadeOut(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .height(150.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.7f),
+                            Color.Transparent
                         )
                     )
-            )
-        }
-
-        // ========== 顶部控制栏 ==========
-        AnimatedVisibility(
-            visible = viewModel.showControls,
-            enter = fadeIn(),
-            exit = fadeOut()
+                )
         ) {
+
+            // ========== 顶部控制栏 ==========
             TopAppBar(
                 modifier = Modifier.statusBarsPadding(),
                 title = {
@@ -461,236 +456,241 @@ fun VideoPlayerScreen(
                     titleContentColor = Color.White
                 )
             )
+
         }
 
-        // ========== 底部渐隐背景 ==========
+
         AnimatedVisibility(
             visible = viewModel.showControls,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.BottomCenter),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(160.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.8f)
-                            )
+           // modifier = Modifier.align(Alignment.BottomCenter),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(160.dp)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.8f)
                         )
                     )
-            )
-        }
-
-        // ========== 底部控制栏 ==========
-        AnimatedVisibility(
-            visible = viewModel.showControls,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.align(Alignment.BottomCenter)
+                )
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+
+            // ========== 底部渐隐背景 ==========
+            Box(
+                contentAlignment = Alignment.BottomCenter,
+
             ) {
-                // --- 还原按钮 ---
-                // 使用阈值判断，避免浮点数误差导致按钮无法消失
-                val isTransformed = Math.abs(videoScale - 1f) > 0.01f ||
-                        Math.abs(videoRotation) > 0.5f ||
-                        videoOffset != Offset.Zero
-                AnimatedVisibility(
-                    visible = isTransformed,
-                    enter = fadeIn(),
-                    exit = fadeOut()
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .padding(bottom = 12.dp)
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(Color.Black.copy(alpha = 0.6f))
-                            .clickable {
-                                videoScale = 1f
-                                videoOffset = Offset.Zero
-                                videoRotation = 0f
-                            }
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        contentAlignment = Alignment.Center
+
+                // ========== 底部控制栏 ==========
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                )
+                {
+                    // --- 还原按钮 ---
+                    // 使用阈值判断，避免浮点数误差导致按钮无法消失
+                    val isTransformed = Math.abs(videoScale - 1f) > 0.01f ||
+                            Math.abs(videoRotation) > 0.5f ||
+                            videoOffset != Offset.Zero
+                    AnimatedVisibility(
+                        visible = isTransformed,
+                        enter = fadeIn(),
+                        exit = fadeOut()
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = stringResource(R.string.video_reset_hint),
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = stringResource(R.string.video_reset_hint),
-                                color = Color.White,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium
-                            )
+                        Box(
+                            modifier = Modifier
+                                .padding(bottom = 12.dp)
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color.Black.copy(alpha = 0.6f))
+                                .clickable {
+                                    videoScale = 1f
+                                    videoOffset = Offset.Zero
+                                    videoRotation = 0f
+                                }
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = stringResource(R.string.video_reset_hint),
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = stringResource(R.string.video_reset_hint),
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
                         }
                     }
-                }
 
-                ProgressBar(
-                    currentPositionMs = viewModel.currentPositionMs,
-                    durationMs = video.durationMs.toFloat(),
-                    isPrepared = viewModel.isPrepared,
-                    fallbackDurationMs = video.durationMs.toFloat(),
-                    fallbackDurationText = video.formattedDuration,
-                    onSeek = { seekMs ->
-                        viewModel.seekTo(seekMs)
-                        viewModel.showControls()
-                    }
-                )
+                    ProgressBar(
+                        currentPositionMs = viewModel.currentPositionMs,
+                        durationMs = video.durationMs.toFloat(),
+                        isPrepared = viewModel.isPrepared,
+                        fallbackDurationMs = video.durationMs.toFloat(),
+                        fallbackDurationText = video.formattedDuration,
+                        onSeek = { seekMs ->
+                            viewModel.seekTo(seekMs)
+                            viewModel.showControls()
+                        }
+                    )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                // --- 播放控制按钮行 ---
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    // 播放速度
-                    Box {
+                    // --- 播放控制按钮行 ---
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        // 播放速度
+                        Box {
+                            IconButton(
+                                onClick = { viewModel.showSpeedMenu = true },
+                                modifier = Modifier.size(44.dp)
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = Icons.Default.Speed,
+                                        contentDescription = stringResource(R.string.video_playback_speed),
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Text(
+                                        text = "${viewModel.playbackSpeed}x",
+                                        color = Color.White.copy(alpha = 0.7f),
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                            DropdownMenu(
+                                expanded = viewModel.showSpeedMenu,
+                                onDismissRequest = { viewModel.dismissSpeedMenu() }
+                            ) {
+                                listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { speed ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = "${speed}x",
+                                                fontWeight = if (speed == viewModel.playbackSpeed) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (speed == viewModel.playbackSpeed) VideoPrimary else Color.Unspecified
+                                            )
+                                        },
+                                        onClick = {
+                                            viewModel.setSpeed(speed)
+                                            viewModel.dismissSpeedMenu()
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        // 后退10秒
                         IconButton(
-                            onClick = { viewModel.showSpeedMenu = true },
-                            modifier = Modifier.size(44.dp)
+                            onClick = {
+                                viewModel.skipBackward()
+                                viewModel.showControls()
+                            },
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(
-                                    imageVector = Icons.Default.Speed,
-                                    contentDescription = stringResource(R.string.video_playback_speed),
+                                    imageVector = Icons.Default.FastRewind,
+                                    contentDescription = stringResource(R.string.video_rewind),
                                     tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(28.dp)
                                 )
                                 Text(
-                                    text = "${viewModel.playbackSpeed}x",
+                                    text = stringResource(R.string.video_seconds),
                                     color = Color.White.copy(alpha = 0.7f),
-                                    fontSize = 10.sp
+                                    fontSize = 9.sp
                                 )
                             }
                         }
-                        DropdownMenu(
-                            expanded = viewModel.showSpeedMenu,
-                            onDismissRequest = { viewModel.dismissSpeedMenu() }
+
+                        // 播放/暂停
+                        IconButton(
+                            onClick = {
+                                viewModel.togglePlayPause()
+                                viewModel.showControls()
+                            },
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(VideoPrimary)
                         ) {
-                            listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { speed ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = "${speed}x",
-                                            fontWeight = if (speed == viewModel.playbackSpeed) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (speed == viewModel.playbackSpeed) VideoPrimary else Color.Unspecified
-                                        )
-                                    },
-                                    onClick = {
-                                        viewModel.setSpeed(speed)
-                                        viewModel.dismissSpeedMenu()
-                                    }
+                            Icon(
+                                imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = if (viewModel.isPlaying) stringResource(R.string.video_pause) else stringResource(
+                                    R.string.video_play
+                                ),
+                                tint = Color(0xFF003544),
+                                modifier = Modifier.size(32.dp)
+                            )
+                        }
+
+                        // 前进10秒
+                        IconButton(
+                            onClick = {
+                                viewModel.skipForward()
+                                viewModel.showControls()
+                            },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Default.FastForward,
+                                    contentDescription = stringResource(R.string.video_forward),
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                                Text(
+                                    text = stringResource(R.string.video_seconds),
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    fontSize = 9.sp
                                 )
                             }
                         }
-                    }
 
-                    // 后退10秒
-                    IconButton(
-                        onClick = {
-                            viewModel.skipBackward()
-                            viewModel.showControls()
-                        },
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        // 全屏/旋转
+                        IconButton(
+                            onClick = {
+                                val isLandscape =
+                                    context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                                context.requestedOrientation = if (isLandscape) {
+                                    ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                                } else {
+                                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                }
+                            },
+                            modifier = Modifier.size(44.dp)
+                        ) {
                             Icon(
-                                imageVector = Icons.Default.FastRewind,
-                                contentDescription = stringResource(R.string.video_rewind),
+                                imageVector = Icons.Default.Fullscreen,
+                                contentDescription = stringResource(R.string.video_fullscreen),
                                 tint = Color.White,
-                                modifier = Modifier.size(28.dp)
-                            )
-                            Text(
-                                text = stringResource(R.string.video_seconds),
-                                color = Color.White.copy(alpha = 0.7f),
-                                fontSize = 9.sp
+                                modifier = Modifier.size(24.dp)
                             )
                         }
-                    }
-
-                    // 播放/暂停
-                    IconButton(
-                        onClick = {
-                            viewModel.togglePlayPause()
-                            viewModel.showControls()
-                        },
-                        modifier = Modifier
-                            .size(56.dp)
-                            .clip(CircleShape)
-                            .background(VideoPrimary)
-                    ) {
-                        Icon(
-                            imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            contentDescription = if (viewModel.isPlaying) stringResource(R.string.video_pause) else stringResource(R.string.video_play),
-                            tint = Color(0xFF003544),
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-
-                    // 前进10秒
-                    IconButton(
-                        onClick = {
-                            viewModel.skipForward()
-                            viewModel.showControls()
-                        },
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.FastForward,
-                                contentDescription = stringResource(R.string.video_forward),
-                                tint = Color.White,
-                                modifier = Modifier.size(28.dp)
-                            )
-                            Text(
-                                text = stringResource(R.string.video_seconds),
-                                color = Color.White.copy(alpha = 0.7f),
-                                fontSize = 9.sp
-                            )
-                        }
-                    }
-
-                    // 全屏/旋转
-                    IconButton(
-                        onClick = {
-                            val isLandscape =
-                                context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-                            context.requestedOrientation = if (isLandscape) {
-                                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                            } else {
-                                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                            }
-                        },
-                        modifier = Modifier.size(44.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Fullscreen,
-                            contentDescription = stringResource(R.string.video_fullscreen),
-                            tint = Color.White,
-                            modifier = Modifier.size(24.dp)
-                        )
                     }
                 }
+
             }
         }
+
 
         // ========== 手势提示覆盖层 ==========
         // 左侧 - 亮度调节

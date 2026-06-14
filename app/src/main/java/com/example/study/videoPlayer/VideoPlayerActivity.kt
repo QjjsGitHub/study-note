@@ -36,8 +36,6 @@ import com.example.study.videoPlayer.ui.screens.VideoPlayerScreen
 import com.example.study.videoPlayer.ui.theme.VideoPlayerTheme
 import com.example.study.videoPlayer.viewmodel.VideoListViewModel
 import com.example.study.videoPlayer.viewmodel.VideoPlayerViewModel
-import kotlinx.coroutines.delay
-import kotlin.time.Duration.Companion.milliseconds
 
 class VideoPlayerActivity : ComponentActivity() {
 
@@ -76,25 +74,21 @@ class VideoPlayerActivity : ComponentActivity() {
 
                 var currentVideo by remember { mutableStateOf<VideoItem?>(null) }
 
-                // ── 控制状态栏显示/隐藏 ──────────────────────
-                LaunchedEffect(currentVideo) {
-                    val window = this@VideoPlayerActivity.window
-                    val controller = WindowCompat.getInsetsController(window, window.decorView)
-                    if (currentVideo != null) {
-                        // 延迟 200ms 隐藏状态栏，让 AnimatedContent 过渡动画先渲染几帧
-                        // 避免状态栏收起动画与页面转场动画在同帧竞争，减少掉帧
-                        delay(200L.milliseconds)
-                        controller.hide(WindowInsetsCompat.Type.statusBars())
-                        controller.systemBarsBehavior =
-                            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                    } else {
-                        // 列表界面：立即显示状态栏
-                        controller.show(WindowInsetsCompat.Type.statusBars())
-                    }
-                }
 
-                // ── 观察 ViewModel 一次性事件 ──────────────────────
                 LaunchedEffect(Unit) {
+
+                    // ── 首次进入自动扫描（权限已授予时） ──────────────
+                    val permission = getStoragePermission()
+                    if (ContextCompat.checkSelfPermission(
+                            this@VideoPlayerActivity, permission
+                        ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        listViewModel.scanVideos()
+                    } else {
+                        requestPermissionLauncher.launch(permission)
+                    }
+
+                    // ── 观察 ViewModel 一次性事件 ──────────────────────
                     listViewModel.events.collect { event ->
                         when (event) {
                             is VideoListViewModel.ScanEvent.Success -> {
@@ -113,19 +107,6 @@ class VideoPlayerActivity : ComponentActivity() {
                                 ).show()
                             }
                         }
-                    }
-                }
-
-                // ── 首次进入自动扫描（权限已授予时） ──────────────
-                LaunchedEffect(Unit) {
-                    val permission = getStoragePermission()
-                    if (ContextCompat.checkSelfPermission(
-                            this@VideoPlayerActivity, permission
-                        ) == PackageManager.PERMISSION_GRANTED
-                    ) {
-                        listViewModel.scanVideos()
-                    } else {
-                        requestPermissionLauncher.launch(permission)
                     }
                 }
 
@@ -158,6 +139,9 @@ class VideoPlayerActivity : ComponentActivity() {
                     }
                 }
 
+                val window = this@VideoPlayerActivity.window
+                val controller = WindowCompat.getInsetsController(window, window.decorView)
+
                 AnimatedContent(
                     targetState = currentVideo,
                     transitionSpec = {
@@ -171,15 +155,22 @@ class VideoPlayerActivity : ComponentActivity() {
                     },
                     label = "video_navigation"
                 ) { video ->
-                    if (video != null) {
-                        BackHandler(onBack = onBack)
 
+                    if (video != null) {
+                        // 隐藏状态栏，
+                        controller.hide(WindowInsetsCompat.Type.statusBars())
+                        controller.systemBarsBehavior =
+                            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+
+                        BackHandler(onBack = onBack)
                         VideoPlayerScreen(
                             viewModel = playerViewModel,
                             video = video,
                             onBack = onBack
                         )
                     } else {
+                        // 列表界面：立即显示状态栏
+                        controller.show(WindowInsetsCompat.Type.statusBars())
                         VideoListScreen(
                             viewModel = listViewModel,
                             onVideoClick = { currentVideo = it },
