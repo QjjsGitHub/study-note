@@ -35,6 +35,9 @@ import com.example.study.videoPlayer.ui.screens.VideoListScreen
 import com.example.study.videoPlayer.ui.screens.VideoPlayerScreen
 import com.example.study.videoPlayer.ui.theme.VideoPlayerTheme
 import com.example.study.videoPlayer.viewmodel.VideoListViewModel
+import com.example.study.videoPlayer.viewmodel.VideoPlayerViewModel
+import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 class VideoPlayerActivity : ComponentActivity() {
 
@@ -67,6 +70,9 @@ class VideoPlayerActivity : ComponentActivity() {
             VideoPlayerTheme {
 
                 val listViewModel: VideoListViewModel by viewModels()
+                // 预创建播放器 ViewModel，让 MediaPlayer 构造在列表页完成
+                // 避免首次点击时在主线程上同步创建 MediaPlayer 造成卡顿
+                val playerViewModel: VideoPlayerViewModel by viewModels()
 
                 var currentVideo by remember { mutableStateOf<VideoItem?>(null) }
 
@@ -75,13 +81,14 @@ class VideoPlayerActivity : ComponentActivity() {
                     val window = this@VideoPlayerActivity.window
                     val controller = WindowCompat.getInsetsController(window, window.decorView)
                     if (currentVideo != null) {
-                        // 播放界面：隐藏状态栏
+                        // 延迟 200ms 隐藏状态栏，让 AnimatedContent 过渡动画先渲染几帧
+                        // 避免状态栏收起动画与页面转场动画在同帧竞争，减少掉帧
+                        delay(200L.milliseconds)
                         controller.hide(WindowInsetsCompat.Type.statusBars())
-                        // 可选：设置隐藏行为（如滑动显示后自动隐藏）
-                        controller.systemBarsBehavior = 
+                        controller.systemBarsBehavior =
                             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                     } else {
-                        // 列表界面：显示状态栏
+                        // 列表界面：立即显示状态栏
                         controller.show(WindowInsetsCompat.Type.statusBars())
                     }
                 }
@@ -168,6 +175,7 @@ class VideoPlayerActivity : ComponentActivity() {
                         BackHandler(onBack = onBack)
 
                         VideoPlayerScreen(
+                            viewModel = playerViewModel,
                             video = video,
                             onBack = onBack
                         )

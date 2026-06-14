@@ -81,10 +81,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.example.study.R
 import com.example.study.videoPlayer.model.VideoItem
 import com.example.study.videoPlayer.ui.theme.VideoBackground
@@ -94,22 +91,19 @@ import com.example.study.videoPlayer.util.formatTime
 import com.example.study.videoPlayer.viewmodel.VideoPlayerViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.launch
 import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoPlayerScreen(
+    viewModel: VideoPlayerViewModel,
     video: VideoItem,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val viewModelStore: ViewModelStoreOwner =
-        LocalViewModelStoreOwner.current ?: return
-
-    val viewModel: VideoPlayerViewModel =
-        ViewModelProvider(viewModelStore)[VideoPlayerViewModel::class]
 
     val activity: Activity
     // ─── 从系统读取初始亮度与音量 ───
@@ -124,37 +118,37 @@ fun VideoPlayerScreen(
 
     val originalBrightness = remember { activity.window.attributes.screenBrightness }
 
-    // 初始化 ViewModel 的亮度/音量（仅首次）
+    // ── 亮度/音量初始化 + 持续同步（合并为单一 LaunchedEffect 减少首次组合开销） ──
     LaunchedEffect(Unit) {
+        // 1. 初始化：从系统读取当前亮度/音量
         val curBrightness = activity.window.attributes.screenBrightness
         viewModel.updateBrightness(
-            if (curBrightness < 0f) 0.5f else curBrightness.coerceIn(
-                0.01f,
-                1f
-            )
+            if (curBrightness < 0f) 0.5f else curBrightness.coerceIn(0.01f, 1f)
         )
         val curVolume =
             audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / maxVolume
         viewModel.updateVolume(curVolume)
-    }
 
-    // ── 同步 ViewModel 亮度 → 系统窗口（节流优化版） ──────────────────────────
-    LaunchedEffect(Unit) {
-        snapshotFlow { viewModel.brightness }
-            .conflate() // 合并过快的值，只保留最新值
-            .collect { value ->
-                val lp = activity.window.attributes
-                lp.screenBrightness = value
-                activity.window.attributes = lp
-                // 限制系统调用频率为每 40ms 一次 (~25 FPS)，足以保证视觉流畅且不阻塞系统
-                delay(40.milliseconds)
-            }
-    }
+        // 2. 持续同步亮度到系统窗口（节流 40ms）
+        launch {
+            snapshotFlow { viewModel.brightness }
+                .conflate() // 合并过快的值，只保留最新值
+                .collect { value ->
+                    val lp = activity.window.attributes
+                    lp.screenBrightness = value
+                    activity.window.attributes = lp
+                    delay(40.milliseconds)
+                }
+        }
 
-    // ── 同步 ViewModel 音量 → AudioManager ─────────────────────
-    LaunchedEffect(viewModel.volume) {
-        val streamVol = (viewModel.volume * maxVolume).toInt()
-        audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, streamVol, 0)
+        // 3. 持续同步音量到 AudioManager
+        launch {
+            snapshotFlow { viewModel.volume }
+                .collect { value ->
+                    val streamVol = (value * maxVolume).toInt()
+                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, streamVol, 0)
+                }
+        }
     }
 
     // ── 自动隐藏亮度 / 音量覆盖层（滑动中重置计时器） ──────────────────────

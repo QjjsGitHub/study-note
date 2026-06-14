@@ -11,10 +11,12 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.study.videoPlayer.model.VideoItem
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.core.net.toUri
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -59,6 +61,7 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     private var currentVideo: VideoItem? = null
     private var currentSurface: Surface? = null
     private var progressJob: Job? = null
+    private var prepareJob: Job? = null
     private var controlsAutoHideJob: Job? = null
 
     init {
@@ -247,21 +250,33 @@ class VideoPlayerViewModel(application: Application) : AndroidViewModel(applicat
     // ── 私有助手 ────────────────────────────────────────────────────
 
     private fun preparePlayer(video: VideoItem, surface: Surface) {
-        safeExecute {
-            mediaPlayer.reset()
-            isPrepared = false
-            hasError = false
-            stopProgressPolling()
+        // 取消上一个未完成的准备任务，避免并发操作 MediaPlayer
+        prepareJob?.cancel()
+        isPrepared = false
+        hasError = false
+        stopProgressPolling()
 
-            val uri = video.contentUri?.toUri()
-            if (uri?.scheme == "content") {
-                mediaPlayer.setDataSource(getApplication(), uri)
-            } else {
-                mediaPlayer.setDataSource(video.filePath)
+        prepareJob = viewModelScope.launch {
+            try {
+                // 将重量级同步操作（reset + setDataSource）移到 IO 线程
+                // 避免阻塞主线程导致首次点击卡顿
+                withContext(Dispatchers.IO) {
+                    mediaPlayer.reset()
+                    val uri = video.contentUri?.toUri()
+                    if (uri?.scheme == "content") {
+                        mediaPlayer.setDataSource(getApplication(), uri)
+                    } else {
+                        mediaPlayer.setDataSource(video.filePath)
+                    }
+                }
+                // 回到主线程设置 Surface 并异步准备播放
+                mediaPlayer.setSurface(surface)
+                mediaPlayer.prepareAsync()
+            } catch (e: Exception) {
+                Log.e("VideoPlayerVM", "preparePlayer Error", e)
+                hasError = true
+                isPrepared = false
             }
-
-            mediaPlayer.setSurface(surface)
-            mediaPlayer.prepareAsync()
         }
     }
 
