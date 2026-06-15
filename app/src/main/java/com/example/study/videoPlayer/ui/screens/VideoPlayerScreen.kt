@@ -17,12 +17,10 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,6 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.BrightnessHigh
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Fullscreen
@@ -43,7 +42,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.BrightnessHigh
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -58,6 +56,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -89,9 +88,11 @@ import com.example.study.videoPlayer.ui.theme.VideoControlBg
 import com.example.study.videoPlayer.ui.theme.VideoPrimary
 import com.example.study.videoPlayer.util.formatTime
 import com.example.study.videoPlayer.viewmodel.VideoPlayerViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -106,43 +107,44 @@ fun VideoPlayerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val activity: Activity
-    // ─── 从系统读取初始亮度与音量 ───
     try {
         activity = context as Activity
     } catch (_: Exception) {
         return
     }
 
-    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+    val audioManager = remember { context.getSystemService(Context.AUDIO_SERVICE) as AudioManager }
     val maxVolume = remember { audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC) }
 
-    val originalBrightness = activity.window.attributes.screenBrightness
+    val originalBrightness = remember { activity.window.attributes.screenBrightness }
 
-    // ── 亮度/音量初始化 + 持续同步（合并为单一 LaunchedEffect 减少首次组合开销） ──
+    // ── 亮度/音量初始化 + 持续同步（异步处理） ──
     LaunchedEffect(Unit) {
-        // 1. 初始化：从系统读取当前亮度/音量
-        val curBrightness = activity.window.attributes.screenBrightness
-        viewModel.updateBrightness(
-            if (curBrightness < 0f) 0.5f else curBrightness.coerceIn(0.01f, 1f)
-        )
-        val curVolume =
-            audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / maxVolume
-        viewModel.updateVolume(curVolume)
+        delay(300.milliseconds)
 
-        // 2. 持续同步亮度到系统窗口（节流 40ms）
-        launch {
+        val (initBrightness, initVolume) = withContext(Dispatchers.Default) {
+            val b = activity.window.attributes.screenBrightness
+            val v = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / maxVolume
+            b to v
+        }
+
+        viewModel.updateBrightness(if (initBrightness < 0f) 0.5f else initBrightness.coerceIn(0.01f, 1f))
+        viewModel.updateVolume(initVolume)
+
+        launch(Dispatchers.Default) {
             snapshotFlow { viewModel.brightness }
-                .conflate() // 合并过快的值，只保留最新值
+                .conflate()
                 .collect { value ->
-                    val lp = activity.window.attributes
-                    lp.screenBrightness = value
-                    activity.window.attributes = lp
+                    withContext(Dispatchers.Main) {
+                        val lp = activity.window.attributes
+                        lp.screenBrightness = value
+                        activity.window.attributes = lp
+                    }
                     delay(40.milliseconds)
                 }
         }
 
-        // 3. 持续同步音量到 AudioManager
-        launch {
+        launch(Dispatchers.IO) {
             snapshotFlow { viewModel.volume }
                 .collect { value ->
                     val streamVol = (value * maxVolume).toInt()
@@ -151,7 +153,14 @@ fun VideoPlayerScreen(
         }
     }
 
-    // ── 自动隐藏亮度 / 音量覆盖层（滑动中重置计时器） ──────────────────────
+    // 控制栏入场延迟：避免与转场动画竞争资源
+    var isScreenReady by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(400.milliseconds)
+        isScreenReady = true
+    }
+
+    // ── 自动隐藏调节覆盖层 ──────────────────────
     LaunchedEffect(viewModel.showBrightnessOverlay) {
         if (viewModel.showBrightnessOverlay) {
             delay(1500L.milliseconds)
@@ -168,14 +177,10 @@ fun VideoPlayerScreen(
     // ── 生命周期处理 ──────────────────────────────────────────
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE) {
-                viewModel.onPause()
-            }
+            if (event == Lifecycle.Event.ON_PAUSE) viewModel.onPause()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // ── 自由缩放与旋转状态 ──────────────────────────────────────────
@@ -190,53 +195,32 @@ fun VideoPlayerScreen(
                 val lp = activity.window.attributes
                 lp.screenBrightness = originalBrightness
                 activity.window.attributes = lp
-            } catch (_: Exception) {
-            }
+            } catch (_: Exception) {}
         }
     }
 
-    BoxWithConstraints(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(VideoBackground)
-            // 1. 处理点击切换控制栏
             .pointerInput(Unit) {
                 detectTapGestures(onTap = { viewModel.toggleControls() })
             }
-            // 2. 统一手势处理器：解决调节与变换的冲突
             .pointerInput(Unit) {
                 detectTransformGestures { centroid, pan, zoom, rotation ->
-                    // A. 计算多指状态或是否已处于变换状态
                     val isMultiTouch = zoom != 1f || rotation != 0f
-                    val isTransformed =
-                        Math.abs(videoScale - 1f) > 0.01f || Math.abs(videoRotation) > 0.5f
+                    val isTransformed = videoScale != 1f || videoRotation != 0f
 
                     if (isMultiTouch || isTransformed) {
-                        // 变换模式：缩放、旋转、平移
                         videoScale = (videoScale * zoom).coerceIn(0.5f, 5f)
                         videoRotation += rotation
-
-                        // 只有在放大或旋转后，平移才生效（或正在多指操作中）
-                        if (videoScale > 1.01f || Math.abs(videoRotation) > 0.5f || isMultiTouch) {
-                            videoOffset += pan
-                        } else {
-                            videoOffset = Offset.Zero
-                        }
+                        videoOffset += pan
                     } else {
-                        // 调节模式：画面未变换且是单指滑动，则调节音量/亮度
-                        // 计算滑动比例 (调节灵敏度：划过 1/3 屏幕高度即为全满)
                         val fraction = -pan.y / (size.height.toFloat() / 3f)
                         if (centroid.x < size.width / 2) {
-                            // 左侧 — 亮度
-                            viewModel.updateBrightness(
-                                (viewModel.brightness + fraction).coerceIn(
-                                    0.01f,
-                                    1f
-                                )
-                            )
+                            viewModel.updateBrightness((viewModel.brightness + fraction).coerceIn(0.01f, 1f))
                             viewModel.showBrightnessAdjusting()
                         } else {
-                            // 右侧 — 音量
                             viewModel.updateVolume((viewModel.volume + fraction).coerceIn(0f, 1f))
                             viewModel.showVolumeAdjusting()
                         }
@@ -246,11 +230,7 @@ fun VideoPlayerScreen(
     ) {
         // ========== 视频画面 ==========
         if (viewModel.hasError) {
-            // 播放失败：占位提示
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
@@ -275,129 +255,66 @@ fun VideoPlayerScreen(
                 }
             }
         } else {
-            // 直接用 VideoItem 的宽高（扫描时已从 MediaStore 获取）
-            val videoRatio = if (video.width > 0 && video.height > 0) {
-                video.width.toFloat() / video.height.toFloat()
-            } else {
-                9f / 16f
-            }
-
-            val screenRatio = maxWidth / maxHeight
-            val videoModifier = if (videoRatio >= screenRatio) {
-                Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(videoRatio)
-            } else {
-                Modifier
-                    .fillMaxHeight()
-                    .aspectRatio(videoRatio)
+            val videoRatio = remember(video.width, video.height) {
+                if (video.width > 0 && video.height > 0) video.width.toFloat() / video.height.toFloat() else 16f / 9f
             }
 
             AndroidView(
                 factory = { ctx ->
                     TextureView(ctx).apply {
                         surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-                            override fun onSurfaceTextureAvailable(
-                                st: SurfaceTexture,
-                                width: Int,
-                                height: Int
-                            ) {
-                                val surface = Surface(st)
-                                viewModel.onSurfaceReady(surface, video)
+                            override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
+                                viewModel.onSurfaceReady(Surface(st), video)
                             }
-
-                            override fun onSurfaceTextureSizeChanged(
-                                st: SurfaceTexture,
-                                width: Int,
-                                height: Int
-                            ) {
-                            }
-
+                            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {}
                             override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
                                 viewModel.onSurfaceDestroyed()
                                 return true
                             }
-
                             override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
                         }
                     }
                 },
-                modifier = videoModifier
+                modifier = Modifier
                     .align(Alignment.Center)
-                    .graphicsLayer(
-                        scaleX = videoScale,
-                        scaleY = videoScale,
-                        translationX = videoOffset.x,
-                        translationY = videoOffset.y,
+                    .fillMaxSize()
+                    .aspectRatio(videoRatio)
+                    .graphicsLayer {
+                        scaleX = videoScale
+                        scaleY = videoScale
+                        translationX = videoOffset.x
+                        translationY = videoOffset.y
                         rotationZ = videoRotation
-                    ),
+                    },
             )
-
-            /*// 加载中指示
-            if (!viewModel.isPrepared) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.3f),
-                            modifier = Modifier.size(80.dp)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = video.title,
-                            color = Color.White.copy(alpha = 0.5f),
-                            fontSize = 18.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 32.dp)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "${video.resolution} · ${video.formattedSize}",
-                            color = Color.White.copy(alpha = 0.3f),
-                            fontSize = 13.sp
-                        )
-                    }
-                }
-            }*/
-
         }
 
-        // 中央大播放/暂停按钮（暂停或控件隐藏时显示）
+        // 中央大播放/暂停按钮 (优化：移除 Box 嵌套，直接对 Icon 使用 padding 模拟背景)
         AnimatedVisibility(
-            visible = viewModel.showControls && !viewModel.hasError,
+            visible = isScreenReady && viewModel.showControls && !viewModel.hasError,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.Center),
         ) {
-            Box(
+            Icon(
+                imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription = if (viewModel.isPlaying) stringResource(R.string.video_pause) else stringResource(R.string.video_play),
+                tint = VideoBackground,
                 modifier = Modifier
                     .size(72.dp)
+                    .background(Color.White.copy(alpha = 0.85f), CircleShape)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.85f))
                     .clickable {
                         viewModel.togglePlayPause()
                         viewModel.showControls()
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (viewModel.isPlaying) stringResource(R.string.video_pause) else stringResource(
-                        R.string.video_play
-                    ),
-                    tint = VideoBackground,
-                    modifier = Modifier.size(36.dp)
-                )
-            }
+                    }
+                    .padding(18.dp)
+            )
         }
 
         // ========== 顶部渐隐背景 ==========
         AnimatedVisibility(
-            visible = viewModel.showControls,
+            visible = isScreenReady && viewModel.showControls,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -406,86 +323,48 @@ fun VideoPlayerScreen(
                 .height(150.dp)
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.7f),
-                            Color.Transparent
-                        )
+                        colors = listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent)
                     )
                 )
         ) {
-
-            // ========== 顶部控制栏 ==========
             TopAppBar(
                 modifier = Modifier.statusBarsPadding(),
                 title = {
                     Column {
-                        Text(
-                            text = video.title,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            color = Color.White
-                        )
-                        Text(
-                            text = video.resolution,
-                            fontSize = 12.sp,
-                            color = Color.White.copy(alpha = 0.6f)
-                        )
+                        Text(text = video.title, fontSize = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, color = Color.White)
+                        Text(text = video.resolution, fontSize = 12.sp, color = Color.White.copy(alpha = 0.6f))
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.video_back),
-                            tint = Color.White
-                        )
+                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.video_back), tint = Color.White)
                     }
                 },
                 actions = {
                     IconButton(onClick = { }) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = stringResource(R.string.video_more),
-                            tint = Color.White
-                        )
+                        Icon(imageVector = Icons.Default.MoreVert, contentDescription = stringResource(R.string.video_more), tint = Color.White)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    titleContentColor = Color.White
-                )
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent, titleContentColor = Color.White)
             )
-
         }
 
-
+        // ========== 底部渐隐背景 ==========
         AnimatedVisibility(
-            visible = viewModel.showControls,
+            visible = isScreenReady && viewModel.showControls,
             enter = fadeIn(),
             exit = fadeOut(),
-           // modifier = Modifier.align(Alignment.BottomCenter),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(160.dp)
                 .align(Alignment.BottomCenter)
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.8f)
-                        )
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
                     )
                 )
         ) {
-
-            // ========== 底部渐隐背景 ==========
-            Box(
-                contentAlignment = Alignment.BottomCenter,
-
-            ) {
-
-                // ========== 底部控制栏 ==========
+            Box(contentAlignment = Alignment.BottomCenter) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -493,18 +372,13 @@ fun VideoPlayerScreen(
                         .padding(horizontal = 16.dp)
                         .padding(bottom = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
-                )
-                {
-                    // --- 还原按钮 ---
-                    // 使用阈值判断，避免浮点数误差导致按钮无法消失
-                    val isTransformed = Math.abs(videoScale - 1f) > 0.01f ||
-                            Math.abs(videoRotation) > 0.5f ||
-                            videoOffset != Offset.Zero
-                    AnimatedVisibility(
-                        visible = isTransformed,
-                        enter = fadeIn(),
-                        exit = fadeOut()
-                    ) {
+                ) {
+                    val isTransformed by remember {
+                        derivedStateOf {
+                            videoScale!=1f || videoRotation!=0f || videoOffset != Offset.Zero
+                        }
+                    }
+                    AnimatedVisibility(visible = isTransformed, enter = fadeIn(), exit = fadeOut()) {
                         Box(
                             modifier = Modifier
                                 .padding(bottom = 12.dp)
@@ -519,19 +393,9 @@ fun VideoPlayerScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = stringResource(R.string.video_reset_hint),
-                                    tint = Color.White,
-                                    modifier = Modifier.size(16.dp)
-                                )
+                                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.video_reset_hint), tint = Color.White, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = stringResource(R.string.video_reset_hint),
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
+                                Text(text = stringResource(R.string.video_reset_hint), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                             }
                         }
                     }
@@ -550,218 +414,79 @@ fun VideoPlayerScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // --- 播放控制按钮行 ---
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        // 播放速度
                         Box {
-                            IconButton(
-                                onClick = { viewModel.showSpeedMenu = true },
-                                modifier = Modifier.size(44.dp)
-                            ) {
+                            IconButton(onClick = { viewModel.showSpeedMenu = true }, modifier = Modifier.size(44.dp)) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(
-                                        imageVector = Icons.Default.Speed,
-                                        contentDescription = stringResource(R.string.video_playback_speed),
-                                        tint = Color.White,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Text(
-                                        text = "${viewModel.playbackSpeed}x",
-                                        color = Color.White.copy(alpha = 0.7f),
-                                        fontSize = 10.sp
-                                    )
+                                    Icon(Icons.Default.Speed, contentDescription = stringResource(R.string.video_playback_speed), tint = Color.White, modifier = Modifier.size(24.dp))
+                                    Text(text = "${viewModel.playbackSpeed}x", color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp)
                                 }
                             }
-                            DropdownMenu(
-                                expanded = viewModel.showSpeedMenu,
-                                onDismissRequest = { viewModel.dismissSpeedMenu() }
-                            ) {
+                            DropdownMenu(expanded = viewModel.showSpeedMenu, onDismissRequest = { viewModel.dismissSpeedMenu() }) {
                                 listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { speed ->
                                     DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                text = "${speed}x",
-                                                fontWeight = if (speed == viewModel.playbackSpeed) FontWeight.Bold else FontWeight.Normal,
-                                                color = if (speed == viewModel.playbackSpeed) VideoPrimary else Color.Unspecified
-                                            )
-                                        },
-                                        onClick = {
-                                            viewModel.setSpeed(speed)
-                                            viewModel.dismissSpeedMenu()
-                                        }
+                                        text = { Text(text = "${speed}x", fontWeight = if (speed == viewModel.playbackSpeed) FontWeight.Bold else FontWeight.Normal, color = if (speed == viewModel.playbackSpeed) VideoPrimary else Color.Unspecified) },
+                                        onClick = { viewModel.setSpeed(speed); viewModel.dismissSpeedMenu() }
                                     )
                                 }
                             }
                         }
 
-                        // 后退10秒
-                        IconButton(
-                            onClick = {
-                                viewModel.skipBackward()
-                                viewModel.showControls()
-                            },
-                            modifier = Modifier.size(48.dp)
-                        ) {
+                        IconButton(onClick = { viewModel.skipBackward(); viewModel.showControls() }, modifier = Modifier.size(48.dp)) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    imageVector = Icons.Default.FastRewind,
-                                    contentDescription = stringResource(R.string.video_rewind),
-                                    tint = Color.White,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                                Text(
-                                    text = stringResource(R.string.video_seconds),
-                                    color = Color.White.copy(alpha = 0.7f),
-                                    fontSize = 9.sp
-                                )
+                                Icon(Icons.Default.FastRewind, contentDescription = stringResource(R.string.video_rewind), tint = Color.White, modifier = Modifier.size(28.dp))
+                                Text(text = stringResource(R.string.video_seconds), color = Color.White.copy(alpha = 0.7f), fontSize = 9.sp)
                             }
                         }
 
-                        // 播放/暂停
                         IconButton(
-                            onClick = {
-                                viewModel.togglePlayPause()
-                                viewModel.showControls()
-                            },
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                                .background(VideoPrimary)
+                            onClick = { viewModel.togglePlayPause(); viewModel.showControls() },
+                            modifier = Modifier.size(56.dp).clip(CircleShape).background(VideoPrimary)
                         ) {
-                            Icon(
-                                imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = if (viewModel.isPlaying) stringResource(R.string.video_pause) else stringResource(
-                                    R.string.video_play
-                                ),
-                                tint = Color(0xFF003544),
-                                modifier = Modifier.size(32.dp)
-                            )
+                            Icon(imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = null, tint = Color(0xFF003544), modifier = Modifier.size(32.dp))
                         }
 
-                        // 前进10秒
-                        IconButton(
-                            onClick = {
-                                viewModel.skipForward()
-                                viewModel.showControls()
-                            },
-                            modifier = Modifier.size(48.dp)
-                        ) {
+                        IconButton(onClick = { viewModel.skipForward(); viewModel.showControls() }, modifier = Modifier.size(48.dp)) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(
-                                    imageVector = Icons.Default.FastForward,
-                                    contentDescription = stringResource(R.string.video_forward),
-                                    tint = Color.White,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                                Text(
-                                    text = stringResource(R.string.video_seconds),
-                                    color = Color.White.copy(alpha = 0.7f),
-                                    fontSize = 9.sp
-                                )
+                                Icon(Icons.Default.FastForward, contentDescription = stringResource(R.string.video_forward), tint = Color.White, modifier = Modifier.size(28.dp))
+                                Text(text = stringResource(R.string.video_seconds), color = Color.White.copy(alpha = 0.7f), fontSize = 9.sp)
                             }
                         }
 
-                        // 全屏/旋转
                         IconButton(
                             onClick = {
-                                val isLandscape =
-                                    context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-                                context.requestedOrientation = if (isLandscape) {
-                                    ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                } else {
-                                    ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                                }
+                                val isLandscape = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                                activity.requestedOrientation = if (isLandscape) ActivityInfo.SCREEN_ORIENTATION_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                             },
                             modifier = Modifier.size(44.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Fullscreen,
-                                contentDescription = stringResource(R.string.video_fullscreen),
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
+                            Icon(Icons.Default.Fullscreen, contentDescription = stringResource(R.string.video_fullscreen), tint = Color.White, modifier = Modifier.size(24.dp))
                         }
                     }
                 }
-
             }
         }
-
 
         // ========== 手势提示覆盖层 ==========
-        // 左侧 - 亮度调节
-        AnimatedVisibility(
-            visible = viewModel.showBrightnessOverlay,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 16.dp)
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(VideoControlBg)
-                    .padding(12.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.BrightnessHigh,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
+        AnimatedVisibility(visible = viewModel.showBrightnessOverlay, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp)) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(VideoControlBg).padding(12.dp)) {
+                Icon(Icons.Default.BrightnessHigh, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = stringResource(R.string.video_brightness),
-                    color = Color.White,
-                    fontSize = 12.sp
-                )
-                Text(
-                    text = "${(viewModel.brightness * 100).toInt()}%",
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 11.sp
-                )
+                Text(text = stringResource(R.string.video_brightness), color = Color.White, fontSize = 12.sp)
+                Text(text = "${(viewModel.brightness * 100).toInt()}%", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
             }
         }
 
-        // 右侧 - 音量调节
-        AnimatedVisibility(
-            visible = viewModel.showVolumeOverlay,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 16.dp)
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(VideoControlBg)
-                    .padding(12.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.VolumeUp,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
+        AnimatedVisibility(visible = viewModel.showVolumeOverlay, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp)) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(VideoControlBg).padding(12.dp)) {
+                Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = stringResource(R.string.video_volume),
-                    color = Color.White,
-                    fontSize = 12.sp
-                )
-                Text(
-                    text = "${(viewModel.volume * 100).toInt()}%",
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 11.sp
-                )
+                Text(text = stringResource(R.string.video_volume), color = Color.White, fontSize = 12.sp)
+                Text(text = "${(viewModel.volume * 100).toInt()}%", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
             }
         }
     }
@@ -785,52 +510,17 @@ private fun ProgressBar(
         sliderProgress = progress
     }
 
-    val displayedPositionMs = if (isDragging) {
-        sliderProgress * totalMs
-    } else {
-        currentPositionMs
-    }
+    val displayedPositionMs = if (isDragging) sliderProgress * totalMs else currentPositionMs
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = formatTime(displayedPositionMs.roundToLong()),
-            color = Color.White.copy(alpha = 0.8f),
-            fontSize = 12.sp,
-            modifier = Modifier.width(44.dp),
-            textAlign = TextAlign.Center
-        )
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(text = formatTime(displayedPositionMs.roundToLong()), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.Center)
         Slider(
             value = sliderProgress,
-            onValueChange = { newProgress ->
-                isDragging = true
-                sliderProgress = newProgress
-            },
-            onValueChangeFinished = {
-                isDragging = false
-                onSeek((sliderProgress * totalMs).roundToLong().toInt())
-            },
-            modifier = Modifier
-                .weight(1f)
-                .height(20.dp),
-            colors = SliderDefaults.colors(
-                thumbColor = VideoPrimary,
-                activeTrackColor = VideoPrimary,
-                inactiveTrackColor = Color.White.copy(alpha = 0.3f)
-            )
+            onValueChange = { isDragging = true; sliderProgress = it },
+            onValueChangeFinished = { isDragging = false; onSeek((sliderProgress * totalMs).roundToLong().toInt()) },
+            modifier = Modifier.weight(1f).height(20.dp),
+            colors = SliderDefaults.colors(thumbColor = VideoPrimary, activeTrackColor = VideoPrimary, inactiveTrackColor = Color.White.copy(alpha = 0.3f))
         )
-        Text(
-            text = if (isPrepared && durationMs > 0) {
-                formatTime(durationMs.roundToLong())
-            } else {
-                fallbackDurationText
-            },
-            color = Color.White.copy(alpha = 0.8f),
-            fontSize = 12.sp,
-            modifier = Modifier.width(44.dp),
-            textAlign = TextAlign.Center
-        )
+        Text(text = if (isPrepared && durationMs > 0) formatTime(durationMs.roundToLong()) else fallbackDurationText, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.Center)
     }
 }
