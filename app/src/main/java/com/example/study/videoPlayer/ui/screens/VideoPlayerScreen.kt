@@ -119,9 +119,14 @@ fun VideoPlayerScreen(
 
     val originalBrightness = remember { activity.window.attributes.screenBrightness }
 
+    // 控制栏入场延迟：避免与转场动画竞争资源
+    var isScreenReady by remember { mutableStateOf(false) }
+
     // ── 亮度/音量初始化 + 持续同步（异步处理） ──
     LaunchedEffect(Unit) {
-        delay(300.milliseconds)
+
+        delay(400.milliseconds)
+        isScreenReady = true
 
         val (initBrightness, initVolume) = withContext(Dispatchers.Default) {
             val b = activity.window.attributes.screenBrightness
@@ -153,13 +158,6 @@ fun VideoPlayerScreen(
                 audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, streamVol, 0)
             }
         }
-    }
-
-    // 控制栏入场延迟：避免与转场动画竞争资源
-    var isScreenReady by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(400.milliseconds)
-        isScreenReady = true
     }
 
     // ── 自动隐藏调节覆盖层 ──────────────────────
@@ -208,76 +206,82 @@ fun VideoPlayerScreen(
     }
 
     // 实时计算视频画面边界，解决横竖屏切换时闭包捕获导致边界失效的问题
-    val videoLayout = remember(videoRatio, windowInfo.containerSize) {
-        val size = windowInfo.containerSize
-        val screenWidthPx = size.width.toFloat()
-        val screenHeightPx = size.height.toFloat()
-        val screenRatio = screenWidthPx / screenHeightPx
+    // 使用 derivedStateOf 包装计算，防止容器大小在转场动画期间的细微抖动导致大面积重算
+    val videoLayout by remember(videoRatio) {
+        derivedStateOf {
+            val size = windowInfo.containerSize
+            val screenWidthPx = size.width.toFloat()
+            val screenHeightPx = size.height.toFloat()
+            if (screenWidthPx == 0f || screenHeightPx == 0f) {
+                return@derivedStateOf Triple(0.dp, 0.dp, 0f..0f)
+            }
 
-        val vWidthPx: Float
-        val vHeightPx: Float
-        if (videoRatio > screenRatio) {
-            vWidthPx = screenWidthPx
-            vHeightPx = screenWidthPx / videoRatio
-        } else {
-            vHeightPx = screenHeightPx
-            vWidthPx = screenHeightPx * videoRatio
+            val screenRatio = screenWidthPx / screenHeightPx
+            val vWidthPx: Float
+            val vHeightPx: Float
+            if (videoRatio > screenRatio) {
+                vWidthPx = screenWidthPx
+                vHeightPx = screenWidthPx / videoRatio
+            } else {
+                vHeightPx = screenHeightPx
+                vWidthPx = screenHeightPx * videoRatio
+            }
+            val topPx = (screenHeightPx - vHeightPx) / 2
+            val bottomPx = (screenHeightPx + vHeightPx) / 2
+
+            val vWidthDp = with(density) { vWidthPx.toDp() }
+            val vHeightDp = with(density) { vHeightPx.toDp() }
+
+            Triple(vWidthDp, vHeightDp, topPx..bottomPx)
         }
-        val topPx = (screenHeightPx - vHeightPx) / 2
-        val bottomPx = (screenHeightPx + vHeightPx) / 2
-
-        // 将精确的像素值转换为 Dp 供渲染层使用
-        val vWidthDp = with(density) { vWidthPx.toDp() }
-        val vHeightDp = with(density) { vHeightPx.toDp() }
-
-        Triple(vWidthDp, vHeightDp, topPx..bottomPx)
     }
     val (vWidthDp, vHeightDp, videoYRange) = videoLayout
 
 
-    Box(modifier = Modifier
-        .fillMaxSize()
-        .background(VideoBackground)
-        .pointerInput(Unit) {
-            detectTapGestures(onTap = { viewModel.toggleControls() })
-        }
-        .pointerInput(videoLayout) {
-            detectTransformGestures { centroid, pan, zoom, rotation ->
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(VideoBackground)
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { viewModel.toggleControls() })
+            }
+            .pointerInput(videoLayout) {
+                detectTransformGestures { centroid, pan, zoom, rotation ->
 
-                // 判断触摸点是否在视频画面内
-                val isInsideVideoY = centroid.y in videoYRange
+                    // 判断触摸点是否在视频画面内
+                    val isInsideVideoY = centroid.y in videoYRange
 
 
-                // 2. 使用阈值判断，避免浮点数精度问题导致的“状态粘连”
-                val isScaling = abs(zoom - 1f) > 0.001f
-                val isRotating = abs(rotation) > 0.1f
-                val isMultiTouch = isScaling || isRotating
+                    // 2. 使用阈值判断，避免浮点数精度问题导致的“状态粘连”
+                    val isScaling = abs(zoom - 1f) > 0.001f
+                    val isRotating = abs(rotation) > 0.1f
+                    val isMultiTouch = isScaling || isRotating
 
-                val isAlreadyTransformed =
-                    abs(videoScale - 1f) > 0.01f || abs(videoRotation) > 0.5f || videoOffset.getDistance() > 1f
+                    val isAlreadyTransformed =
+                        abs(videoScale - 1f) > 0.01f || abs(videoRotation) > 0.5f || videoOffset.getDistance() > 1f
 
-                if (isMultiTouch || isAlreadyTransformed) {
-                    // 变换模式：允许全局操作，确保放大后边缘区域也能“抓得住”
-                    videoScale = (videoScale * zoom).coerceIn(0.5f, 5f)
-                    videoRotation += rotation
-                    videoOffset += pan
-                } else if (isInsideVideoY) {
-                    // 调节模式：仅在视频垂直高度范围内生效，避开顶部/底部黑边（控制栏）区域
-                    val fraction = -pan.y / (size.height.toFloat() / 3f)
-                    if (centroid.x < size.width / 2) {
-                        viewModel.updateBrightness(
-                            (viewModel.brightness + fraction).coerceIn(
-                                0.01f, 1f
+                    if (isMultiTouch || isAlreadyTransformed) {
+                        // 变换模式：允许全局操作，确保放大后边缘区域也能“抓得住”
+                        videoScale = (videoScale * zoom).coerceIn(0.5f, 5f)
+                        videoRotation += rotation
+                        videoOffset += pan
+                    } else if (isInsideVideoY) {
+                        // 调节模式：仅在视频垂直高度范围内生效，避开顶部/底部黑边（控制栏）区域
+                        val fraction = -pan.y / (size.height.toFloat() / 3f)
+                        if (centroid.x < size.width / 2) {
+                            viewModel.updateBrightness(
+                                (viewModel.brightness + fraction).coerceIn(
+                                    0.01f, 1f
+                                )
                             )
-                        )
-                        viewModel.showBrightnessAdjusting()
-                    } else {
-                        viewModel.updateVolume((viewModel.volume + fraction).coerceIn(0f, 1f))
-                        viewModel.showVolumeAdjusting()
+                            viewModel.showBrightnessAdjusting()
+                        } else {
+                            viewModel.updateVolume((viewModel.volume + fraction).coerceIn(0f, 1f))
+                            viewModel.showVolumeAdjusting()
+                        }
                     }
                 }
-            }
-        }) {
+            }) {
         // ========== 视频画面 ==========
         if (viewModel.hasError) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -382,39 +386,39 @@ fun VideoPlayerScreen(
         ) {
             TopAppBar(
                 title = {
-                Column {
-                    Text(
-                        text = video.title,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        color = Color.White
-                    )
-                    Text(
-                        text = video.resolution,
-                        fontSize = 12.sp,
-                        color = Color.White.copy(alpha = 0.6f)
-                    )
-                }
-            }, navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.video_back),
-                        tint = Color.White
-                    )
-                }
-            }, actions = {
-                IconButton(onClick = { }) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = stringResource(R.string.video_more),
-                        tint = Color.White
-                    )
-                }
-            }, colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Transparent, titleContentColor = Color.White
-            )
+                    Column {
+                        Text(
+                            text = video.title,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            color = Color.White
+                        )
+                        Text(
+                            text = video.resolution,
+                            fontSize = 12.sp,
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
+                    }
+                }, navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.video_back),
+                            tint = Color.White
+                        )
+                    }
+                }, actions = {
+                    IconButton(onClick = { }) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = stringResource(R.string.video_more),
+                            tint = Color.White
+                        )
+                    }
+                }, colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent, titleContentColor = Color.White
+                )
             )
         }
 
@@ -523,12 +527,12 @@ fun VideoPlayerScreen(
                                 listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { speed ->
                                     DropdownMenuItem(
                                         text = {
-                                        Text(
-                                            text = "${speed}x",
-                                            fontWeight = if (speed == viewModel.playbackSpeed) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (speed == viewModel.playbackSpeed) VideoPrimary else Color.Unspecified
-                                        )
-                                    },
+                                            Text(
+                                                text = "${speed}x",
+                                                fontWeight = if (speed == viewModel.playbackSpeed) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (speed == viewModel.playbackSpeed) VideoPrimary else Color.Unspecified
+                                            )
+                                        },
                                         onClick = { viewModel.setSpeed(speed); viewModel.dismissSpeedMenu() })
                                 }
                             }
