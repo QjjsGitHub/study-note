@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -129,7 +130,12 @@ fun VideoPlayerScreen(
             b to v
         }
 
-        viewModel.updateBrightness(if (initBrightness < 0f) 0.5f else initBrightness.coerceIn(0.01f, 1f))
+        viewModel.updateBrightness(
+            if (initBrightness < 0f) 0.5f else initBrightness.coerceIn(
+                0.01f,
+                1f
+            )
+        )
         viewModel.updateVolume(initVolume)
 
         launch(Dispatchers.Default) {
@@ -196,34 +202,14 @@ fun VideoPlayerScreen(
                 val lp = activity.window.attributes
                 lp.screenBrightness = originalBrightness
                 activity.window.attributes = lp
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+            }
         }
     }
 
     // ── 视频比例计算 ──
     val videoRatio = remember(video.width, video.height) {
         if (video.width > 0 && video.height > 0) video.width.toFloat() / video.height.toFloat() else 16f / 9f
-    }
-
-    // ── 预计算视频画面在屏幕上的边界（避免在手势回调中重复计算） ──
-    val videoBounds = remember(videoRatio, context.resources.configuration) {
-        val displayMetrics = context.resources.displayMetrics
-        val screenWidth = displayMetrics.widthPixels.toFloat()
-        val screenHeight = displayMetrics.heightPixels.toFloat()
-        val screenRatio = screenWidth / screenHeight
-
-        val vWidth: Float
-        val vHeight: Float
-        if (videoRatio > screenRatio) {
-            vWidth = screenWidth
-            vHeight = screenWidth / videoRatio
-        } else {
-            vHeight = screenHeight
-            vWidth = screenHeight * videoRatio
-        }
-        val left = (screenWidth - vWidth) / 2
-        val top = (screenHeight - vHeight) / 2
-        android.graphics.RectF(left, top, left + vWidth, top + vHeight)
     }
 
     Box(
@@ -233,10 +219,31 @@ fun VideoPlayerScreen(
             .pointerInput(Unit) {
                 detectTapGestures(onTap = { viewModel.toggleControls() })
             }
-            .pointerInput(Unit) {
+            .pointerInput(videoRatio) {
                 detectTransformGestures { centroid, pan, zoom, rotation ->
-                    // 1. 快速判断触摸点是否在视频画面内
-                    if (!videoBounds.contains(centroid.x, centroid.y)) return@detectTransformGestures
+
+                    // 1. 实时计算视频画面边界，解决横竖屏切换时闭包捕获导致边界失效的问题
+                    val screenWidth = size.width.toFloat()
+                    val screenHeight = size.height.toFloat()
+                    val screenRatio = screenWidth / screenHeight
+
+                    val vWidth: Float
+                    val vHeight: Float
+                    if (videoRatio > screenRatio) {
+                        vWidth = screenWidth
+                        vHeight = screenWidth / videoRatio
+                    } else {
+                        vHeight = screenHeight
+                        vWidth = screenHeight * videoRatio
+                    }
+                    val left = (screenWidth - vWidth) / 2
+                    val top = (screenHeight - vHeight) / 2
+
+                    // 判断触摸点是否在视频画面内
+                    val isInsideVideoX = centroid.x in left..(left + vWidth)
+                    val isInsideVideoY = centroid.y in top..(top + vHeight)
+
+                    //if (!isInsideVideo) return@detectTransformGestures
 
                     // 2. 使用阈值判断，避免浮点数精度问题导致的“状态粘连”
                     val isScaling = abs(zoom - 1f) > 0.001f
@@ -248,13 +255,20 @@ fun VideoPlayerScreen(
                             videoOffset.getDistance() > 1f
 
                     if (isMultiTouch || isAlreadyTransformed) {
-                        videoScale = (videoScale * zoom).coerceIn(0.5f, 5f)
-                        videoRotation += rotation
-                        videoOffset += pan
-                    } else {
+                        if (isInsideVideoX && isInsideVideoY) {
+                            videoScale = (videoScale * zoom).coerceIn(0.5f, 5f)
+                            videoRotation += rotation
+                            videoOffset += pan
+                        }
+                    } else if (isInsideVideoY) {
                         val fraction = -pan.y / (size.height.toFloat() / 3f)
                         if (centroid.x < size.width / 2) {
-                            viewModel.updateBrightness((viewModel.brightness + fraction).coerceIn(0.01f, 1f))
+                            viewModel.updateBrightness(
+                                (viewModel.brightness + fraction).coerceIn(
+                                    0.01f,
+                                    1f
+                                )
+                            )
                             viewModel.showBrightnessAdjusting()
                         } else {
                             viewModel.updateVolume((viewModel.volume + fraction).coerceIn(0f, 1f))
@@ -295,21 +309,35 @@ fun VideoPlayerScreen(
                 factory = { ctx ->
                     TextureView(ctx).apply {
                         surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-                            override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
+                            override fun onSurfaceTextureAvailable(
+                                st: SurfaceTexture,
+                                w: Int,
+                                h: Int
+                            ) {
                                 viewModel.onSurfaceReady(Surface(st), video)
                             }
-                            override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {}
+
+                            override fun onSurfaceTextureSizeChanged(
+                                st: SurfaceTexture,
+                                w: Int,
+                                h: Int
+                            ) {
+                            }
+
                             override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
                                 viewModel.onSurfaceDestroyed()
                                 return true
                             }
+
                             override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
                         }
                     }
                 },
                 modifier = Modifier
                     .align(Alignment.Center)
+                    // 使用 wrapContentSize + aspectRatio 实现标准 "Fit" 模式，防止黑边区域画面裁切
                     .fillMaxSize()
+                    .wrapContentSize(Alignment.Center)
                     .aspectRatio(videoRatio)
                     .graphicsLayer {
                         scaleX = videoScale
@@ -330,7 +358,9 @@ fun VideoPlayerScreen(
         ) {
             Icon(
                 imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                contentDescription = if (viewModel.isPlaying) stringResource(R.string.video_pause) else stringResource(R.string.video_play),
+                contentDescription = if (viewModel.isPlaying) stringResource(R.string.video_pause) else stringResource(
+                    R.string.video_play
+                ),
                 tint = VideoBackground,
                 modifier = Modifier
                     .size(72.dp)
@@ -351,7 +381,6 @@ fun VideoPlayerScreen(
             exit = fadeOut(),
             modifier = Modifier
                 .fillMaxWidth()
-                .statusBarsPadding()
                 .height(150.dp)
                 .background(
                     Brush.verticalGradient(
@@ -363,21 +392,42 @@ fun VideoPlayerScreen(
                 modifier = Modifier.statusBarsPadding(),
                 title = {
                     Column {
-                        Text(text = video.title, fontSize = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, color = Color.White)
-                        Text(text = video.resolution, fontSize = 12.sp, color = Color.White.copy(alpha = 0.6f))
+                        Text(
+                            text = video.title,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            color = Color.White
+                        )
+                        Text(
+                            text = video.resolution,
+                            fontSize = 12.sp,
+                            color = Color.White.copy(alpha = 0.6f)
+                        )
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.video_back), tint = Color.White)
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.video_back),
+                            tint = Color.White
+                        )
                     }
                 },
                 actions = {
                     IconButton(onClick = { }) {
-                        Icon(imageVector = Icons.Default.MoreVert, contentDescription = stringResource(R.string.video_more), tint = Color.White)
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = stringResource(R.string.video_more),
+                            tint = Color.White
+                        )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent, titleContentColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.Transparent,
+                    titleContentColor = Color.White
+                )
             )
         }
 
@@ -412,7 +462,11 @@ fun VideoPlayerScreen(
                                     videoOffset.getDistance() > 1f
                         }
                     }
-                    AnimatedVisibility(visible = isTransformed, enter = fadeIn(), exit = fadeOut()) {
+                    AnimatedVisibility(
+                        visible = isTransformed,
+                        enter = fadeIn(),
+                        exit = fadeOut()
+                    ) {
                         Box(
                             modifier = Modifier
                                 .padding(bottom = 12.dp)
@@ -427,9 +481,19 @@ fun VideoPlayerScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.video_reset_hint), tint = Color.White, modifier = Modifier.size(16.dp))
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = stringResource(R.string.video_reset_hint),
+                                    tint = Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text(text = stringResource(R.string.video_reset_hint), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                Text(
+                                    text = stringResource(R.string.video_reset_hint),
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
                             }
                         }
                     }
@@ -454,51 +518,110 @@ fun VideoPlayerScreen(
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         Box {
-                            IconButton(onClick = { viewModel.showSpeedMenu = true }, modifier = Modifier.size(44.dp)) {
+                            IconButton(
+                                onClick = { viewModel.showSpeedMenu = true },
+                                modifier = Modifier.size(44.dp)
+                            ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.Speed, contentDescription = stringResource(R.string.video_playback_speed), tint = Color.White, modifier = Modifier.size(24.dp))
-                                    Text(text = "${viewModel.playbackSpeed}x", color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp)
+                                    Icon(
+                                        Icons.Default.Speed,
+                                        contentDescription = stringResource(R.string.video_playback_speed),
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Text(
+                                        text = "${viewModel.playbackSpeed}x",
+                                        color = Color.White.copy(alpha = 0.7f),
+                                        fontSize = 10.sp
+                                    )
                                 }
                             }
-                            DropdownMenu(expanded = viewModel.showSpeedMenu, onDismissRequest = { viewModel.dismissSpeedMenu() }) {
+                            DropdownMenu(
+                                expanded = viewModel.showSpeedMenu,
+                                onDismissRequest = { viewModel.dismissSpeedMenu() }) {
                                 listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { speed ->
                                     DropdownMenuItem(
-                                        text = { Text(text = "${speed}x", fontWeight = if (speed == viewModel.playbackSpeed) FontWeight.Bold else FontWeight.Normal, color = if (speed == viewModel.playbackSpeed) VideoPrimary else Color.Unspecified) },
+                                        text = {
+                                            Text(
+                                                text = "${speed}x",
+                                                fontWeight = if (speed == viewModel.playbackSpeed) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (speed == viewModel.playbackSpeed) VideoPrimary else Color.Unspecified
+                                            )
+                                        },
                                         onClick = { viewModel.setSpeed(speed); viewModel.dismissSpeedMenu() }
                                     )
                                 }
                             }
                         }
 
-                        IconButton(onClick = { viewModel.skipBackward(); viewModel.showControls() }, modifier = Modifier.size(48.dp)) {
+                        IconButton(
+                            onClick = { viewModel.skipBackward(); viewModel.showControls() },
+                            modifier = Modifier.size(48.dp)
+                        ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.FastRewind, contentDescription = stringResource(R.string.video_rewind), tint = Color.White, modifier = Modifier.size(28.dp))
-                                Text(text = stringResource(R.string.video_seconds), color = Color.White.copy(alpha = 0.7f), fontSize = 9.sp)
+                                Icon(
+                                    Icons.Default.FastRewind,
+                                    contentDescription = stringResource(R.string.video_rewind),
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                                Text(
+                                    text = stringResource(R.string.video_seconds),
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    fontSize = 9.sp
+                                )
                             }
                         }
 
                         IconButton(
                             onClick = { viewModel.togglePlayPause(); viewModel.showControls() },
-                            modifier = Modifier.size(56.dp).clip(CircleShape).background(VideoPrimary)
+                            modifier = Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(VideoPrimary)
                         ) {
-                            Icon(imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = null, tint = Color(0xFF003544), modifier = Modifier.size(32.dp))
+                            Icon(
+                                imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                tint = Color(0xFF003544),
+                                modifier = Modifier.size(32.dp)
+                            )
                         }
 
-                        IconButton(onClick = { viewModel.skipForward(); viewModel.showControls() }, modifier = Modifier.size(48.dp)) {
+                        IconButton(
+                            onClick = { viewModel.skipForward(); viewModel.showControls() },
+                            modifier = Modifier.size(48.dp)
+                        ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.FastForward, contentDescription = stringResource(R.string.video_forward), tint = Color.White, modifier = Modifier.size(28.dp))
-                                Text(text = stringResource(R.string.video_seconds), color = Color.White.copy(alpha = 0.7f), fontSize = 9.sp)
+                                Icon(
+                                    Icons.Default.FastForward,
+                                    contentDescription = stringResource(R.string.video_forward),
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                                Text(
+                                    text = stringResource(R.string.video_seconds),
+                                    color = Color.White.copy(alpha = 0.7f),
+                                    fontSize = 9.sp
+                                )
                             }
                         }
 
                         IconButton(
                             onClick = {
-                                val isLandscape = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-                                activity.requestedOrientation = if (isLandscape) ActivityInfo.SCREEN_ORIENTATION_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                                val isLandscape =
+                                    context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                                activity.requestedOrientation =
+                                    if (isLandscape) ActivityInfo.SCREEN_ORIENTATION_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                             },
                             modifier = Modifier.size(44.dp)
                         ) {
-                            Icon(Icons.Default.Fullscreen, contentDescription = stringResource(R.string.video_fullscreen), tint = Color.White, modifier = Modifier.size(24.dp))
+                            Icon(
+                                Icons.Default.Fullscreen,
+                                contentDescription = stringResource(R.string.video_fullscreen),
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
                         }
                     }
                 }
@@ -506,21 +629,73 @@ fun VideoPlayerScreen(
         }
 
         // ========== 手势提示覆盖层 ==========
-        AnimatedVisibility(visible = viewModel.showBrightnessOverlay, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp)) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(VideoControlBg).padding(12.dp)) {
-                Icon(Icons.Default.BrightnessHigh, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+        AnimatedVisibility(
+            visible = viewModel.showBrightnessOverlay,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 16.dp)
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(VideoControlBg)
+                    .padding(12.dp)
+            ) {
+                Icon(
+                    Icons.Default.BrightnessHigh,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(text = stringResource(R.string.video_brightness), color = Color.White, fontSize = 12.sp)
-                Text(text = "${(viewModel.brightness * 100).toInt()}%", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+                Text(
+                    text = stringResource(R.string.video_brightness),
+                    color = Color.White,
+                    fontSize = 12.sp
+                )
+                Text(
+                    text = "${(viewModel.brightness * 100).toInt()}%",
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 11.sp
+                )
             }
         }
 
-        AnimatedVisibility(visible = viewModel.showVolumeOverlay, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp)) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(VideoControlBg).padding(12.dp)) {
-                Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+        AnimatedVisibility(
+            visible = viewModel.showVolumeOverlay,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 16.dp)
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(VideoControlBg)
+                    .padding(12.dp)
+            ) {
+                Icon(
+                    Icons.AutoMirrored.Filled.VolumeUp,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(text = stringResource(R.string.video_volume), color = Color.White, fontSize = 12.sp)
-                Text(text = "${(viewModel.volume * 100).toInt()}%", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+                Text(
+                    text = stringResource(R.string.video_volume),
+                    color = Color.White,
+                    fontSize = 12.sp
+                )
+                Text(
+                    text = "${(viewModel.volume * 100).toInt()}%",
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 11.sp
+                )
             }
         }
     }
@@ -547,14 +722,34 @@ private fun ProgressBar(
     val displayedPositionMs = if (isDragging) sliderProgress * totalMs else currentPositionMs
 
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(text = formatTime(displayedPositionMs.roundToLong()), color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.Center)
+        Text(
+            text = formatTime(displayedPositionMs.roundToLong()),
+            color = Color.White.copy(alpha = 0.8f),
+            fontSize = 12.sp,
+            modifier = Modifier.width(44.dp),
+            textAlign = TextAlign.Center
+        )
         Slider(
             value = sliderProgress,
             onValueChange = { isDragging = true; sliderProgress = it },
-            onValueChangeFinished = { isDragging = false; onSeek((sliderProgress * totalMs).roundToLong().toInt()) },
-            modifier = Modifier.weight(1f).height(20.dp),
-            colors = SliderDefaults.colors(thumbColor = VideoPrimary, activeTrackColor = VideoPrimary, inactiveTrackColor = Color.White.copy(alpha = 0.3f))
+            onValueChangeFinished = {
+                isDragging = false; onSeek((sliderProgress * totalMs).roundToLong().toInt())
+            },
+            modifier = Modifier
+                .weight(1f)
+                .height(20.dp),
+            colors = SliderDefaults.colors(
+                thumbColor = VideoPrimary,
+                activeTrackColor = VideoPrimary,
+                inactiveTrackColor = Color.White.copy(alpha = 0.3f)
+            )
         )
-        Text(text = if (isPrepared && durationMs > 0) formatTime(durationMs.roundToLong()) else fallbackDurationText, color = Color.White.copy(alpha = 0.8f), fontSize = 12.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.Center)
+        Text(
+            text = if (isPrepared && durationMs > 0) formatTime(durationMs.roundToLong()) else fallbackDurationText,
+            color = Color.White.copy(alpha = 0.8f),
+            fontSize = 12.sp,
+            modifier = Modifier.width(44.dp),
+            textAlign = TextAlign.Center
+        )
     }
 }
