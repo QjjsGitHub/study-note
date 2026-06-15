@@ -93,6 +93,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.abs
 import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -199,6 +200,32 @@ fun VideoPlayerScreen(
         }
     }
 
+    // ── 视频比例计算 ──
+    val videoRatio = remember(video.width, video.height) {
+        if (video.width > 0 && video.height > 0) video.width.toFloat() / video.height.toFloat() else 16f / 9f
+    }
+
+    // ── 预计算视频画面在屏幕上的边界（避免在手势回调中重复计算） ──
+    val videoBounds = remember(videoRatio, context.resources.configuration) {
+        val displayMetrics = context.resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels.toFloat()
+        val screenHeight = displayMetrics.heightPixels.toFloat()
+        val screenRatio = screenWidth / screenHeight
+
+        val vWidth: Float
+        val vHeight: Float
+        if (videoRatio > screenRatio) {
+            vWidth = screenWidth
+            vHeight = screenWidth / videoRatio
+        } else {
+            vHeight = screenHeight
+            vWidth = screenHeight * videoRatio
+        }
+        val left = (screenWidth - vWidth) / 2
+        val top = (screenHeight - vHeight) / 2
+        android.graphics.RectF(left, top, left + vWidth, top + vHeight)
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -208,10 +235,19 @@ fun VideoPlayerScreen(
             }
             .pointerInput(Unit) {
                 detectTransformGestures { centroid, pan, zoom, rotation ->
-                    val isMultiTouch = zoom != 1f || rotation != 0f
-                    val isTransformed = videoScale != 1f || videoRotation != 0f
+                    // 1. 快速判断触摸点是否在视频画面内
+                    if (!videoBounds.contains(centroid.x, centroid.y)) return@detectTransformGestures
 
-                    if (isMultiTouch || isTransformed) {
+                    // 2. 使用阈值判断，避免浮点数精度问题导致的“状态粘连”
+                    val isScaling = abs(zoom - 1f) > 0.001f
+                    val isRotating = abs(rotation) > 0.1f
+                    val isMultiTouch = isScaling || isRotating
+
+                    val isAlreadyTransformed = abs(videoScale - 1f) > 0.01f ||
+                            abs(videoRotation) > 0.5f ||
+                            videoOffset.getDistance() > 1f
+
+                    if (isMultiTouch || isAlreadyTransformed) {
                         videoScale = (videoScale * zoom).coerceIn(0.5f, 5f)
                         videoRotation += rotation
                         videoOffset += pan
@@ -255,10 +291,6 @@ fun VideoPlayerScreen(
                 }
             }
         } else {
-            val videoRatio = remember(video.width, video.height) {
-                if (video.width > 0 && video.height > 0) video.width.toFloat() / video.height.toFloat() else 16f / 9f
-            }
-
             AndroidView(
                 factory = { ctx ->
                     TextureView(ctx).apply {
@@ -375,7 +407,9 @@ fun VideoPlayerScreen(
                 ) {
                     val isTransformed by remember {
                         derivedStateOf {
-                            videoScale!=1f || videoRotation!=0f || videoOffset != Offset.Zero
+                            abs(videoScale - 1f) > 0.01f ||
+                                    abs(videoRotation) > 0.5f ||
+                                    videoOffset.getDistance() > 1f
                         }
                     }
                     AnimatedVisibility(visible = isTransformed, enter = fadeIn(), exit = fadeOut()) {
