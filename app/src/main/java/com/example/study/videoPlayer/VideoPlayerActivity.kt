@@ -36,6 +36,8 @@ import com.example.study.videoPlayer.ui.screens.VideoPlayerScreen
 import com.example.study.videoPlayer.ui.theme.VideoPlayerTheme
 import com.example.study.videoPlayer.viewmodel.VideoListViewModel
 import com.example.study.videoPlayer.viewmodel.VideoPlayerViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class VideoPlayerActivity : ComponentActivity() {
 
@@ -56,14 +58,6 @@ class VideoPlayerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // 注册 Coil ImageLoader：content:// 视频 URI → loadThumbnail()
-        Coil.setImageLoader(
-            ImageLoader.Builder(applicationContext)
-                .components { add(VideoThumbnailFetcher.Factory(applicationContext)) }
-                .crossfade(false)
-                .build()
-        )
-
         setContent {
             VideoPlayerTheme {
 
@@ -76,6 +70,16 @@ class VideoPlayerActivity : ComponentActivity() {
 
 
                 LaunchedEffect(Unit) {
+
+                    withContext(Dispatchers.IO) {
+                        // 注册 Coil ImageLoader：content:// 视频 URI → loadThumbnail()
+                        Coil.setImageLoader(
+                            ImageLoader.Builder(applicationContext)
+                                .components { add(VideoThumbnailFetcher.Factory(applicationContext)) }
+                                .crossfade(false)
+                                .build()
+                        )
+                    }
 
                     // ── 首次进入自动扫描（权限已授予时） ──────────────
                     val permission = getStoragePermission()
@@ -140,7 +144,8 @@ class VideoPlayerActivity : ComponentActivity() {
                 }
 
                 val window = this@VideoPlayerActivity.window
-                val controller = WindowCompat.getInsetsController(window, window.decorView)
+                val controller =
+                    remember { WindowCompat.getInsetsController(window, window.decorView) }
 
                 AnimatedContent(
                     targetState = currentVideo,
