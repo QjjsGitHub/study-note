@@ -69,13 +69,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -105,7 +104,7 @@ fun VideoPlayerScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val configuration = LocalConfiguration.current
+    val windowInfo = LocalWindowInfo.current
     val density = LocalDensity.current
 
     val activity: Activity
@@ -209,24 +208,29 @@ fun VideoPlayerScreen(
     }
 
     // 实时计算视频画面边界，解决横竖屏切换时闭包捕获导致边界失效的问题
-    val videoLayout = remember(videoRatio, configuration.screenWidthDp, configuration.screenHeightDp) {
-        val screenWidthDp = configuration.screenWidthDp.dp
-        val screenHeightDp = configuration.screenHeightDp.dp
-        val screenRatio = screenWidthDp.value / screenHeightDp.value
+    val videoLayout = remember(videoRatio, windowInfo.containerSize) {
+        val size = windowInfo.containerSize
+        val screenWidthPx = size.width.toFloat()
+        val screenHeightPx = size.height.toFloat()
+        val screenRatio = screenWidthPx / screenHeightPx
 
-        val vWidth: Dp
-        val vHeight: Dp
+        val vWidthPx: Float
+        val vHeightPx: Float
         if (videoRatio > screenRatio) {
-            vWidth = screenWidthDp
-            vHeight = screenWidthDp / videoRatio
+            vWidthPx = screenWidthPx
+            vHeightPx = screenWidthPx / videoRatio
         } else {
-            vHeight = screenHeightDp
-            vWidth = screenHeightDp * videoRatio
+            vHeightPx = screenHeightPx
+            vWidthPx = screenHeightPx * videoRatio
         }
-        val topPx = with(density) { ((screenHeightDp - vHeight) / 2).toPx() }
-        val bottomPx = with(density) { ((screenHeightDp + vHeight) / 2).toPx() }
+        val topPx = (screenHeightPx - vHeightPx) / 2
+        val bottomPx = (screenHeightPx + vHeightPx) / 2
 
-        Triple(vWidth, vHeight, topPx..bottomPx)
+        // 将精确的像素值转换为 Dp 供渲染层使用
+        val vWidthDp = with(density) { vWidthPx.toDp() }
+        val vHeightDp = with(density) { vHeightPx.toDp() }
+
+        Triple(vWidthDp, vHeightDp, topPx..bottomPx)
     }
     val (vWidthDp, vHeightDp, videoYRange) = videoLayout
 
