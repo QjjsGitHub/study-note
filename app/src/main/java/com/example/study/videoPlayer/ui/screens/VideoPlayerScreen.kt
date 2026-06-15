@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -240,10 +239,8 @@ fun VideoPlayerScreen(
                     val top = (screenHeight - vHeight) / 2
 
                     // 判断触摸点是否在视频画面内
-                    val isInsideVideoX = centroid.x in left..(left + vWidth)
+                    // val isInsideVideoX = centroid.x in left..(left + vWidth)
                     val isInsideVideoY = centroid.y in top..(top + vHeight)
-
-                    //if (!isInsideVideo) return@detectTransformGestures
 
                     // 2. 使用阈值判断，避免浮点数精度问题导致的“状态粘连”
                     val isScaling = abs(zoom - 1f) > 0.001f
@@ -255,12 +252,12 @@ fun VideoPlayerScreen(
                             videoOffset.getDistance() > 1f
 
                     if (isMultiTouch || isAlreadyTransformed) {
-                        if (isInsideVideoX && isInsideVideoY) {
-                            videoScale = (videoScale * zoom).coerceIn(0.5f, 5f)
-                            videoRotation += rotation
-                            videoOffset += pan
-                        }
+                        // 变换模式：允许全局操作，确保放大后边缘区域也能“抓得住”
+                        videoScale = (videoScale * zoom).coerceIn(0.5f, 5f)
+                        videoRotation += rotation
+                        videoOffset += pan
                     } else if (isInsideVideoY) {
+                        // 调节模式：仅在视频垂直高度范围内生效，避开顶部/底部黑边（控制栏）区域
                         val fraction = -pan.y / (size.height.toFloat() / 3f)
                         if (centroid.x < size.width / 2) {
                             viewModel.updateBrightness(
@@ -389,7 +386,6 @@ fun VideoPlayerScreen(
                 )
         ) {
             TopAppBar(
-                modifier = Modifier.statusBarsPadding(),
                 title = {
                     Column {
                         Text(
