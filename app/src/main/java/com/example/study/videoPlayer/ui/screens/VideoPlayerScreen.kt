@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -129,7 +128,12 @@ fun VideoPlayerScreen(
             b to v
         }
 
-        viewModel.updateBrightness(if (initBrightness < 0f) 0.5f else initBrightness.coerceIn(0.01f, 1f))
+        viewModel.updateBrightness(
+            if (initBrightness < 0f) 0.5f else initBrightness.coerceIn(
+                0.01f,
+                1f
+            )
+        )
         viewModel.updateVolume(initVolume)
 
         launch(Dispatchers.Default) {
@@ -186,7 +190,8 @@ fun VideoPlayerScreen(
                 val lp = activity.window.attributes
                 lp.screenBrightness = originalBrightness
                 activity.window.attributes = lp
-            } catch (_: Exception) { }
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -229,53 +234,57 @@ fun VideoPlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(VideoBackground)
-    ) {
-        // ========== 1. 视频画面与手势捕捉层 ==========
-        // 这一层专门负责视频内容的渲染和全屏手势检测
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(Unit) {
-                    detectTapGestures(onTap = { viewModel.toggleControls() })
-                }
-                .pointerInput(videoLayout) {
-                    detectTransformGestures { centroid, pan, zoom, rotation ->
-                        val isInsideVideoY = centroid.y in videoYRange
-                        val isScaling = abs(zoom - 1f) > 0.001f
-                        val isRotating = abs(rotation) > 0.1f
-                        val isMultiTouch = isScaling || isRotating
-                        val isAlreadyTransformed = abs(videoScale - 1f) > 0.01f || abs(videoRotation) > 0.5f || videoOffset.getDistance() > 1f
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { viewModel.toggleControls() })
+            }
+            .pointerInput(videoLayout) {
+                detectTransformGestures { centroid, pan, zoom, rotation ->
+                    val isInsideVideoY = centroid.y in videoYRange
+                    val isScaling = abs(zoom - 1f) > 0.001f
+                    val isRotating = abs(rotation) > 0.1f
+                    val isMultiTouch = isScaling || isRotating
+                    val isAlreadyTransformed =
+                        abs(videoScale - 1f) > 0.01f || abs(videoRotation) > 0.5f || videoOffset.getDistance() > 1f
 
-                        if (isMultiTouch || isAlreadyTransformed) {
-                            videoScale = (videoScale * zoom).coerceIn(0.5f, 5f)
-                            videoRotation += rotation
-                            videoOffset += pan
-                        } else if (isInsideVideoY) {
-                            val fraction = -pan.y / (size.height.toFloat() / 3f)
-                            if (centroid.x < size.width / 2) {
-                                viewModel.updateBrightness((viewModel.brightness + fraction).coerceIn(0.01f, 1f))
-                                viewModel.showBrightnessAdjusting()
-                            } else {
-                                viewModel.updateVolume((viewModel.volume + fraction).coerceIn(0f, 1f))
-                                viewModel.showVolumeAdjusting()
-                            }
+                    if (isMultiTouch || isAlreadyTransformed) {
+                        videoScale = (videoScale * zoom).coerceIn(0.5f, 5f)
+                        videoRotation += rotation
+                        videoOffset += pan
+                    } else if (isInsideVideoY) {
+                        val fraction = -pan.y / (size.height.toFloat() / 3f)
+                        if (centroid.x < size.width / 2) {
+                            viewModel.updateBrightness(
+                                (viewModel.brightness + fraction).coerceIn(
+                                    0.01f,
+                                    1f
+                                )
+                            )
+                            viewModel.showBrightnessAdjusting()
+                        } else {
+                            viewModel.updateVolume(
+                                (viewModel.volume + fraction).coerceIn(
+                                    0f,
+                                    1f
+                                )
+                            )
+                            viewModel.showVolumeAdjusting()
                         }
                     }
                 }
-        ) {
-            if (viewModel.hasError) {
-                VideoErrorView(video.title)
-            } else {
-                VideoSurface(
-                    vWidthDp = vWidthDp,
-                    vHeightDp = vHeightDp,
-                    videoScale = videoScale,
-                    videoOffset = videoOffset,
-                    videoRotation = videoRotation,
-                    onSurfaceReady = { surface -> viewModel.onSurfaceReady(surface, video) },
-                    onSurfaceDestroyed = { viewModel.onSurfaceDestroyed() }
-                )
             }
+    ) {
+        if (viewModel.hasError) {
+            VideoErrorView(video.title)
+        } else {
+            VideoSurface(
+                vWidthDp = vWidthDp,
+                vHeightDp = vHeightDp,
+                videoScale = videoScale,
+                videoOffset = videoOffset,
+                videoRotation = videoRotation,
+                onSurfaceReady = { surface -> viewModel.onSurfaceReady(surface, video) },
+                onSurfaceDestroyed = { viewModel.onSurfaceDestroyed() }
+            )
         }
 
         // ========== 2. 静态 UI 控件层 ==========
@@ -320,11 +329,13 @@ private fun BoxScope.VideoSurface(
                     override fun onSurfaceTextureAvailable(st: SurfaceTexture, w: Int, h: Int) {
                         onSurfaceReady(Surface(st))
                     }
+
                     override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, w: Int, h: Int) {}
                     override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
                         onSurfaceDestroyed()
                         return true
                     }
+
                     override fun onSurfaceTextureUpdated(st: SurfaceTexture) {}
                 }
             }
@@ -429,13 +440,27 @@ private fun BoxScope.VideoControlLayer(
         TopAppBar(
             title = {
                 Column {
-                    Text(text = video.title, fontSize = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, color = Color.White)
-                    Text(text = video.resolution, fontSize = 12.sp, color = Color.White.copy(alpha = 0.6f))
+                    Text(
+                        text = video.title,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        color = Color.White
+                    )
+                    Text(
+                        text = video.resolution,
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.6f)
+                    )
                 }
             },
             navigationIcon = {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = null,
+                        tint = Color.White
+                    )
                 }
             },
             actions = {
@@ -446,7 +471,7 @@ private fun BoxScope.VideoControlLayer(
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = Color.Transparent,
                 titleContentColor = Color.White
-            )
+            ), modifier = Modifier
         )
     }
 
@@ -469,26 +494,35 @@ private fun BoxScope.VideoControlLayer(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .navigationBarsPadding()
                     .padding(horizontal = 16.dp)
-                    .padding(bottom = 8.dp),
+                    .padding(bottom = 16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+
                 // 重置按钮（仅在画面发生变换时显示）
-                AnimatedVisibility(visible = isTransformed, enter = fadeIn(), exit = fadeOut()) {
-                    Box(
+                if (isTransformed) {
+                    Row(
                         modifier = Modifier
                             .padding(bottom = 12.dp)
                             .clip(RoundedCornerShape(20.dp))
                             .background(Color.Black.copy(alpha = 0.6f))
                             .clickable { onResetTransform() }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = stringResource(R.string.video_reset_hint), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                        }
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(R.string.video_reset_hint),
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
                     }
                 }
 
@@ -508,15 +542,30 @@ private fun BoxScope.VideoControlLayer(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
+
                     // 倍速菜单
-                    Box {
-                        IconButton(onClick = { viewModel.showSpeedMenu = true }, modifier = Modifier.size(44.dp)) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.Speed, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
-                                Text(text = "${viewModel.playbackSpeed}x", color = Color.White.copy(alpha = 0.7f), fontSize = 10.sp)
-                            }
+                    IconButton(
+                        onClick = { viewModel.showSpeedMenu = true },
+                        modifier = Modifier.size(44.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                Icons.Default.Speed,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Text(
+                                text = "${viewModel.playbackSpeed}x",
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 10.sp
+                            )
                         }
-                        DropdownMenu(expanded = viewModel.showSpeedMenu, onDismissRequest = { viewModel.dismissSpeedMenu() }) {
+
+                        DropdownMenu(
+                            expanded = viewModel.showSpeedMenu,
+                            onDismissRequest = { viewModel.dismissSpeedMenu() }
+                        ) {
                             listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.0f).forEach { speed ->
                                 DropdownMenuItem(
                                     text = {
@@ -532,32 +581,71 @@ private fun BoxScope.VideoControlLayer(
                         }
                     }
 
-                    IconButton(onClick = { viewModel.skipBackward(); viewModel.showControls() }, modifier = Modifier.size(48.dp)) {
+                    IconButton(
+                        onClick = { viewModel.skipBackward(); viewModel.showControls() },
+                        modifier = Modifier.size(48.dp)
+                    ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.FastRewind, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
-                            Text(text = stringResource(R.string.video_seconds), color = Color.White.copy(alpha = 0.7f), fontSize = 9.sp)
+                            Icon(
+                                Icons.Default.FastRewind,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Text(
+                                text = stringResource(R.string.video_seconds),
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 9.sp
+                            )
                         }
                     }
 
                     IconButton(
                         onClick = { viewModel.togglePlayPause(); viewModel.showControls() },
-                        modifier = Modifier.size(56.dp).clip(CircleShape).background(VideoPrimary)
+                        modifier = Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(VideoPrimary)
                     ) {
-                        Icon(imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = null, tint = Color(0xFF003544), modifier = Modifier.size(32.dp))
+                        Icon(
+                            imageVector = if (viewModel.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = Color(0xFF003544),
+                            modifier = Modifier.size(32.dp)
+                        )
                     }
 
-                    IconButton(onClick = { viewModel.skipForward(); viewModel.showControls() }, modifier = Modifier.size(48.dp)) {
+                    IconButton(
+                        onClick = { viewModel.skipForward(); viewModel.showControls() },
+                        modifier = Modifier.size(48.dp)
+                    ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.FastForward, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
-                            Text(text = stringResource(R.string.video_seconds), color = Color.White.copy(alpha = 0.7f), fontSize = 9.sp)
+                            Icon(
+                                Icons.Default.FastForward,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(28.dp)
+                            )
+                            Text(
+                                text = stringResource(R.string.video_seconds),
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 9.sp
+                            )
                         }
                     }
 
                     IconButton(onClick = {
-                        val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-                        activity.requestedOrientation = if (isLandscape) ActivityInfo.SCREEN_ORIENTATION_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                        val isLandscape =
+                            configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                        activity.requestedOrientation =
+                            if (isLandscape) ActivityInfo.SCREEN_ORIENTATION_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
                     }, modifier = Modifier.size(44.dp)) {
-                        Icon(Icons.Default.Fullscreen, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                        Icon(
+                            Icons.Default.Fullscreen,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
                 }
             }
@@ -575,16 +663,34 @@ private fun BoxScope.VideoOverlayLayer(viewModel: VideoPlayerViewModel) {
         visible = viewModel.showBrightnessOverlay,
         enter = fadeIn(),
         exit = fadeOut(),
-        modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp)
+        modifier = Modifier
+            .align(Alignment.CenterStart)
+            .padding(start = 16.dp)
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(VideoControlBg).padding(12.dp)
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(VideoControlBg)
+                .padding(12.dp)
         ) {
-            Icon(Icons.Default.BrightnessHigh, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+            Icon(
+                Icons.Default.BrightnessHigh,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
             Spacer(modifier = Modifier.height(4.dp))
-            Text(text = stringResource(R.string.video_brightness), color = Color.White, fontSize = 12.sp)
-            Text(text = "${(viewModel.brightness * 100).toInt()}%", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+            Text(
+                text = stringResource(R.string.video_brightness),
+                color = Color.White,
+                fontSize = 12.sp
+            )
+            Text(
+                text = "${(viewModel.brightness * 100).toInt()}%",
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 11.sp
+            )
         }
     }
 
@@ -593,16 +699,34 @@ private fun BoxScope.VideoOverlayLayer(viewModel: VideoPlayerViewModel) {
         visible = viewModel.showVolumeOverlay,
         enter = fadeIn(),
         exit = fadeOut(),
-        modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp)
+        modifier = Modifier
+            .align(Alignment.CenterEnd)
+            .padding(end = 16.dp)
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(VideoControlBg).padding(12.dp)
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(VideoControlBg)
+                .padding(12.dp)
         ) {
-            Icon(Icons.AutoMirrored.Filled.VolumeUp, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+            Icon(
+                Icons.AutoMirrored.Filled.VolumeUp,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
             Spacer(modifier = Modifier.height(4.dp))
-            Text(text = stringResource(R.string.video_volume), color = Color.White, fontSize = 12.sp)
-            Text(text = "${(viewModel.volume * 100).toInt()}%", color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp)
+            Text(
+                text = stringResource(R.string.video_volume),
+                color = Color.White,
+                fontSize = 12.sp
+            )
+            Text(
+                text = "${(viewModel.volume * 100).toInt()}%",
+                color = Color.White.copy(alpha = 0.7f),
+                fontSize = 11.sp
+            )
         }
     }
 }
@@ -641,7 +765,9 @@ private fun ProgressBar(
             onValueChangeFinished = {
                 isDragging = false; onSeek((sliderProgress * totalMs).roundToLong().toInt())
             },
-            modifier = Modifier.weight(1f).height(20.dp),
+            modifier = Modifier
+                .weight(1f)
+                .height(20.dp),
             colors = SliderDefaults.colors(
                 thumbColor = VideoPrimary,
                 activeTrackColor = VideoPrimary,
