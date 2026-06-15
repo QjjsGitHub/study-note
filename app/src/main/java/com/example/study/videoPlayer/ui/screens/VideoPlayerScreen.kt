@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,7 +29,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -71,10 +69,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -104,6 +105,8 @@ fun VideoPlayerScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
 
     val activity: Activity
     try {
@@ -205,35 +208,41 @@ fun VideoPlayerScreen(
         if (video.width > 0 && video.height > 0) video.width.toFloat() / video.height.toFloat() else 16f / 9f
     }
 
+    // 实时计算视频画面边界，解决横竖屏切换时闭包捕获导致边界失效的问题
+    val videoLayout = remember(videoRatio, configuration.screenWidthDp, configuration.screenHeightDp) {
+        val screenWidthDp = configuration.screenWidthDp.dp
+        val screenHeightDp = configuration.screenHeightDp.dp
+        val screenRatio = screenWidthDp.value / screenHeightDp.value
+
+        val vWidth: Dp
+        val vHeight: Dp
+        if (videoRatio > screenRatio) {
+            vWidth = screenWidthDp
+            vHeight = screenWidthDp / videoRatio
+        } else {
+            vHeight = screenHeightDp
+            vWidth = screenHeightDp * videoRatio
+        }
+        val topPx = with(density) { ((screenHeightDp - vHeight) / 2).toPx() }
+        val bottomPx = with(density) { ((screenHeightDp + vHeight) / 2).toPx() }
+
+        Triple(vWidth, vHeight, topPx..bottomPx)
+    }
+    val (vWidthDp, vHeightDp, videoYRange) = videoLayout
+
+
     Box(modifier = Modifier
         .fillMaxSize()
         .background(VideoBackground)
         .pointerInput(Unit) {
             detectTapGestures(onTap = { viewModel.toggleControls() })
         }
-        .pointerInput(videoRatio) {
+        .pointerInput(videoLayout) {
             detectTransformGestures { centroid, pan, zoom, rotation ->
 
-                // 1. 实时计算视频画面边界，解决横竖屏切换时闭包捕获导致边界失效的问题
-                val screenWidth = size.width.toFloat()
-                val screenHeight = size.height.toFloat()
-                val screenRatio = screenWidth / screenHeight
-
-                val vWidth: Float
-                val vHeight: Float
-                if (videoRatio > screenRatio) {
-                    vWidth = screenWidth
-                    vHeight = screenWidth / videoRatio
-                } else {
-                    vHeight = screenHeight
-                    vWidth = screenHeight * videoRatio
-                }
-                val left = (screenWidth - vWidth) / 2
-                val top = (screenHeight - vHeight) / 2
-
                 // 判断触摸点是否在视频画面内
-                // val isInsideVideoX = centroid.x in left..(left + vWidth)
-                val isInsideVideoY = centroid.y in top..(top + vHeight)
+                val isInsideVideoY = centroid.y in videoYRange
+
 
                 // 2. 使用阈值判断，避免浮点数精度问题导致的“状态粘连”
                 val isScaling = abs(zoom - 1f) > 0.001f
@@ -318,10 +327,7 @@ fun VideoPlayerScreen(
                 },
                 modifier = Modifier
                     .align(Alignment.Center)
-                    // 使用 wrapContentSize + aspectRatio 实现标准 "Fit" 模式，防止黑边区域画面裁切
-                    .fillMaxSize()
-                    .wrapContentSize(Alignment.Center)
-                    .aspectRatio(videoRatio)
+                    .size(vWidthDp, vHeightDp)
                     .graphicsLayer {
                         scaleX = videoScale
                         scaleY = videoScale
