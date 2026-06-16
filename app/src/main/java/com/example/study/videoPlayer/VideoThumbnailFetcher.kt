@@ -21,7 +21,8 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 
 /**
- * Coil Fetcher：将 video content URI 转成 [ContentResolver.loadThumbnail] 缩略图。
+ * Coil 自定义加载器：视频缩略图抓取器
+ * 负责拦截视频 content URI，并使用系统 ContentResolver 或 ThumbnailUtils 生成视频封面。
  */
 class VideoThumbnailFetcher(
     private val resolver: ContentResolver,
@@ -33,15 +34,16 @@ class VideoThumbnailFetcher(
     companion object {
         /** 
          * 限制全局并发缩略图生成的数量。
-         * 设置为 3 可以确保不会在滑动时瞬间压死磁盘 IO 和解码器。
+         * 设置为 3 可以确保在快速滑动列表时，系统不会因为瞬间启动大量硬件解码任务而导致 UI 卡顿或 OOM。
          */
         private val semaphore = Semaphore(3)
     }
 
     override suspend fun fetch(): FetchResult = withContext(Dispatchers.IO) {
-        // 使用信号量控制并发，实现“一个一个（或少量并行）”加载
+        // 使用信号量控制并发，确保资源利用率平稳
         val bitmap: Bitmap? = semaphore.withPermit {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                // Android Q (API 29) 及以上：使用官方推荐的 loadThumbnail 接口
                 val size = options.size
                 val width = size.width.pxOrElse { 350 }.coerceIn(96, 320)
                 val height = size.height.pxOrElse { 200 }.coerceIn(54, 180)
@@ -52,15 +54,8 @@ class VideoThumbnailFetcher(
                     null
                 }
             } else {
-                // ── Android Q 以下：ThumbnailUtils 需要文件路径 ──────────
-                // 在 Android 10 之前，ContentResolver 没有 loadThumbnail()，
-                // 只能使用 ThumbnailUtils.createVideoThumbnail()。
-                // 但后者只接受文件路径，不接受 content URI。
-                // 所以需要先通过 getPathFromUri() 把 content URI 转成文件路径。
-                // 这是唯一的兼容方式，虽然多一次查询但仅在旧设备上触发。
-                //
-                // 另注意 ThumbnailUtils.createVideoThumbnail() 在 API 29 标记为
-                // @Deprecated，因为官方推荐使用 loadThumbnail() 替代。
+                // ── Android Q 以下：兼容旧版 API ──────────
+                // 旧版本不支持直接从 Uri 加载缩略图，需要先解析出物理文件路径。
                 @Suppress("DEPRECATION")
                 android.media.ThumbnailUtils.createVideoThumbnail(
                     getPathFromUri(uri) ?: "",
@@ -73,11 +68,15 @@ class VideoThumbnailFetcher(
 
         DrawableResult(
             drawable = bitmap.toDrawable(resources),
-            isSampled = true,
+            isSampled = true, // 标记为采样后的图像，优化缓存占用
             dataSource = DataSource.DISK,
         )
     }
 
+    /**
+     * 辅助方法：通过 Content URI 查询数据库获取文件的物理路径。
+     * 仅用于 Android 10 以下的兼容性逻辑。
+     */
     private fun getPathFromUri(uri: Uri): String? {
         val projection = arrayOf<String>(MediaStore.Video.Media.DATA)
         return try {

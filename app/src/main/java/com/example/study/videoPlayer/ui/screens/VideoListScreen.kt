@@ -77,6 +77,15 @@ private val CardBg = VideoSurfaceVariant.copy(alpha = 0.4f)
 private val HeaderBg = VideoSurfaceVariant.copy(alpha = 0.5f)
 private val BadgeBg = VideoPrimary.copy(alpha = 0.15f)
 
+/**
+ * 视频列表主界面
+ * 展示本地视频网格、搜索栏及统计信息。
+ * 
+ * @param viewModel 列表逻辑 ViewModel
+ * @param onVideoClick 点击视频后的跳转回调
+ * @param onRefresh 手动刷新列表回调
+ * @param onScan 手动触发全盘扫描回调
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoListScreen(

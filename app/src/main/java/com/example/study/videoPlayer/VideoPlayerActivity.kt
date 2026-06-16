@@ -39,6 +39,10 @@ import com.example.study.videoPlayer.viewmodel.VideoPlayerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/**
+ * 视频播放模块主 Activity
+ * 负责权限管理、ViewModel 初始化以及视频列表与播放器之间的导航。
+ */
 class VideoPlayerActivity : ComponentActivity() {
 
     /** 权限授予后递增，通知 composable 触发扫描 */
@@ -61,11 +65,13 @@ class VideoPlayerActivity : ComponentActivity() {
         setContent {
             VideoPlayerTheme {
 
+                // 视频列表管理 ViewModel
                 val listViewModel: VideoListViewModel by viewModels()
                 // 预创建播放器 ViewModel，让 MediaPlayer 构造在列表页完成
                 // 避免首次点击时在主线程上同步创建 MediaPlayer 造成卡顿
                 val playerViewModel: VideoPlayerViewModel by viewModels()
 
+                // 当前正在播放的视频，为 null 时显示列表页
                 var currentVideo by remember { mutableStateOf<VideoItem?>(null) }
 
 
@@ -121,14 +127,17 @@ class VideoPlayerActivity : ComponentActivity() {
                     }
                 }
 
-                // 稳定回调引用
+                // 处理返回逻辑
                 val onBack = remember {
                     {
                         currentVideo = null
+                        // 退出播放时重置屏幕方向为未指定，允许系统根据重力感应调整
                         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
                     }
                 }
+                // 列表刷新回调
                 val onRefresh = remember { { listViewModel.scanVideos() } }
+                // 列表扫描回调，包含权限检查逻辑
                 val onScan = remember {
                     {
                         val permission = getStoragePermission()
@@ -147,13 +156,16 @@ class VideoPlayerActivity : ComponentActivity() {
                 val controller =
                     remember { WindowCompat.getInsetsController(window, window.decorView) }
 
+                // 使用 AnimatedContent 实现列表页与播放页之间的平滑左右滑动转场
                 AnimatedContent(
                     targetState = currentVideo,
                     transitionSpec = {
                         if (targetState != null) {
+                            // 进入播放器：列表向左推，播放器从右滑入
                             (slideInHorizontally { it } + fadeIn()) togetherWith
                                     (slideOutHorizontally { -it / 3 } + fadeOut())
                         } else {
+                            // 返回列表：播放器向右滑出，列表从左侧滑回
                             (slideInHorizontally { -it } + fadeIn()) togetherWith
                                     (slideOutHorizontally { it / 3 } + fadeOut())
                         }

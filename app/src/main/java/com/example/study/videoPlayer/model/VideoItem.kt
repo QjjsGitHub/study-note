@@ -4,18 +4,28 @@ import com.example.study.videoPlayer.util.formatTime
 
 /**
  * 本地视频数据模型
+ * 包含视频的元数据信息及预计算的 UI 展示文本。
  */
 data class VideoItem(
+    /** 数据库唯一 ID */
     val id: Long,
+    /** 视频标题 */
     val title: String,
+    /** 文件系统中的绝对路径 */
     val filePath: String,
+    /** 视频时长（毫秒） */
     val durationMs: Long,
+    /** 文件大小（字节） */
     val fileSizeBytes: Long,
+    /** 上次修改时间戳（秒） */
     val dateModified: Long = 0L,
+    /** 视频像素宽度 */
     val width: Int = 0,
+    /** 视频像素高度 */
     val height: Int = 0,
+    /** 分辨率文本，如 "1920×1080" */
     val resolution: String = "未知",
-    /** MediaStore video content URI, used for thumbnail loading and player data source. */
+    /** MediaStore 视频 content URI，用于缩略图加载和播放器数据源 */
     val contentUri: String? = null
 ) {
     /** 格式化时长，如 "01:23:45" 或 "12:34"（构造时预计算，避免滚动中重复算） */

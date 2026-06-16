@@ -1,7 +1,16 @@
 package com.example.study.videoPlayer.util
 
 /**
- * 格式化毫秒为 mm:ss 或 hh:mm:ss
+ * 时间格式化工具类
+ */
+
+/**
+ * 将毫秒数格式化为可读的时间字符串。
+ * 如果时长超过一小时，显示格式为 "H:MM:SS"；
+ * 如果时长不足一小时，显示格式为 "MM:SS"。
+ * 
+ * @param ms 毫秒数
+ * @return 格式化后的时间字符串
  */
 fun formatTime(ms: Long): String {
     val totalSeconds = ms / 1000

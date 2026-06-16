@@ -20,24 +20,30 @@ import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 视频列表 ViewModel — 管理扫描状态与视频列表数据。
+ * 处理视频扫描、排序、搜索逻辑。
  */
 class VideoListViewModel(application: Application) : AndroidViewModel(application) {
 
     // ── UI 状态 ──────────────────────────────────────────────────────
+    /** 原始视频列表（未过滤） */
     var videoList by mutableStateOf<List<VideoItem>>(emptyList())
         private set
 
+    /** 所有视频文件的总大小（字节） */
     var totalSizeBytes by mutableStateOf(0L)
         private set
 
+    /** 是否正在扫描中 */
     var isScanning by mutableStateOf(false)
         private set
 
+    /** 是否已经执行过至少一次扫描 */
     var hasScanned by mutableStateOf(false)
         private set
 
     // ── 排序状态 ────────────────────────────────────────────────────
 
+    /** 视频列表的排序模式 */
     enum class SortMode(val label: String) {
         NAME("按名称排序"),
         DATE("按日期排序"),
@@ -45,6 +51,7 @@ class VideoListViewModel(application: Application) : AndroidViewModel(applicatio
         DURATION("按时长排序")
     }
 
+    /** 当前选中的排序模式 */
     var sortMode by mutableStateOf(SortMode.DATE)
         private set
 
@@ -109,10 +116,12 @@ class VideoListViewModel(application: Application) : AndroidViewModel(applicatio
 
     // ── 搜索控制 ──────────────────────────────────────────────────
 
+    /** 激活搜索模式 */
     fun activateSearch() {
         isSearchActive = true
     }
 
+    /** 退出搜索模式并重置查询关键字 */
     fun deactivateSearch() {
         isSearchActive = false
         searchQuery = ""
@@ -120,7 +129,10 @@ class VideoListViewModel(application: Application) : AndroidViewModel(applicatio
         searchDebounceJob?.cancel()
     }
 
-    /** 输入时调用，200ms 防抖后更新过滤关键字 */
+    /** 
+     * 更新搜索关键字。
+     * 包含 200ms 的防抖处理，防止输入过快导致的频繁重组。
+     */
     fun updateSearchQuery(query: String) {
         searchQuery = query
         searchDebounceJob?.cancel()
@@ -130,11 +142,15 @@ class VideoListViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    /** 更新排序模式 */
     fun updateSortMode(mode: SortMode) {
         sortMode = mode
     }
 
-    /** 扫描本地视频。调用前需确保已获得存储权限。 */
+    /** 
+     * 异步扫描本地视频。
+     * 建议在调用前由 Activity/Fragment 确保已获得存储权限。
+     */
     fun scanVideos() {
         if (isScanning) return
         isScanning = true

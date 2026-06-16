@@ -7,10 +7,12 @@ import android.provider.MediaStore
 import com.example.study.videoPlayer.model.VideoItem
 
 /**
- * 扫描本地视频文件
+ * 本地视频扫描工具类
+ * 利用 ContentResolver 查询 MediaStore 数据库，获取设备上的所有视频文件信息。
  */
 object VideoScanner {
 
+    /** 扫描视频时需要提取的数据库列字段 */
     private val VIDEO_PROJECTION = buildList {
         add(MediaStore.Video.Media._ID)
         add(MediaStore.Video.Media.TITLE)
@@ -32,8 +34,14 @@ object VideoScanner {
         }
     }.toTypedArray()
 
+    /** 默认排序规则：按修改日期降序排列（最新的在前面） */
     private const val SORT_ORDER = "${MediaStore.Video.Media.DATE_MODIFIED} DESC"
 
+    /**
+     * 执行全盘视频扫描
+     * @param contentResolver 系统内容解析器
+     * @return 包含所有发现的视频信息的列表
+     */
     fun scanAllVideos(contentResolver: ContentResolver): List<VideoItem> {
         val videos = mutableListOf<VideoItem>()
         contentResolver.query(
@@ -61,6 +69,7 @@ object VideoScanner {
                 var height = if (heightCol >= 0) cursor.getInt(heightCol) else 0
                 val orientation = if (orientCol >= 0) cursor.getInt(orientCol) else 0
 
+                // 如果视频带有 90 或 270 度的旋转元数据，需要交换宽高值以符合实际显示的视觉宽高
                 if (orientation == 90 || orientation == 270) {
                     val temp = width
                     width = height

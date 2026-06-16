@@ -98,6 +98,14 @@ import kotlin.math.abs
 import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
 
+/**
+ * 视频播放详情界面
+ * 负责视频渲染、播放控制、手势交互（缩放、亮度、音量）以及 UI 控制层的展示。
+ * 
+ * @param viewModel 播放器 ViewModel
+ * @param video 选中的视频条目
+ * @param onBack 返回列表页的回调
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideoPlayerScreen(
