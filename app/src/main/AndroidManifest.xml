@@ -144,6 +144,11 @@
             -->
         </service>
 
+        <service
+            android:name=".remoteController.service.ScreenCaptureService"
+            android:foregroundServiceType="mediaProjection"
+            android:exported="false" />
+
         <activity
             android:name=".service.ServiceActivity"
             android:exported="true" />
@@ -198,7 +203,7 @@
             android:exported="true"
             android:theme="@style/Theme.Study.NoActionBar" />
         <activity
-            android:name=".remoteControler.RemoteControlActivity"
+            android:name=".remoteController.RemoteControlActivity"
             android:exported="false"
             android:label="@string/title_activity_remote_control"
             android:theme="@style/Theme.Study"

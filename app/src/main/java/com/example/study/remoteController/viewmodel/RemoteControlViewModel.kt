@@ -1,12 +1,12 @@
-package com.example.study.remoteControler.viewmodel
+package com.example.study.remoteController.viewmodel
 
 import android.media.projection.MediaProjection
 import android.view.Surface
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.study.remoteControler.media.H264Decoder
-import com.example.study.remoteControler.media.H264Encoder
-import com.example.study.remoteControler.net.LocalNetManager
+import com.example.study.remoteController.media.H264Decoder
+import com.example.study.remoteController.media.H264Encoder
+import com.example.study.remoteController.net.LocalNetManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow

@@ -24,7 +24,7 @@ import com.example.study.fragment.BottomFragmentActivity
 import com.example.study.fragment.FragmentActivity
 import com.example.study.internet.InternetActivity
 import com.example.study.recyclerView.RecyclerViewActivity
-import com.example.study.remoteControler.RemoteControlActivity
+import com.example.study.remoteController.RemoteControlActivity
 import com.example.study.ui.NormalActivity
 import com.example.study.videoPlayer.VideoPlayerActivity
 

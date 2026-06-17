@@ -1,4 +1,4 @@
-package com.example.study.remoteControler.ui.theme
+package com.example.study.remoteController.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme

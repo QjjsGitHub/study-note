@@ -1,4 +1,4 @@
-package com.example.study.remoteControler.media
+package com.example.study.remoteController.media
 
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay

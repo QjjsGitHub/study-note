@@ -1,4 +1,4 @@
-package com.example.study.remoteControler.net
+package com.example.study.remoteController.net
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

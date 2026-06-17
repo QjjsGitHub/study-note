@@ -1,4 +1,4 @@
-package com.example.study.remoteControler.model
+package com.example.study.remoteController.model
 
 // 定义 UI 状态
 data class RemoteControlUiState(

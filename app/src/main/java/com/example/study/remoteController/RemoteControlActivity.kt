@@ -1,11 +1,14 @@
-package com.example.study.remoteControler
+package com.example.study.remoteController
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
@@ -27,9 +30,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.study.remoteControler.ui.theme.StudyTheme
-import com.example.study.remoteControler.viewmodel.RemoteControlViewModel
+import com.example.study.remoteController.service.ScreenCaptureService
+import com.example.study.remoteController.ui.theme.StudyTheme
+import com.example.study.remoteController.viewmodel.RemoteControlViewModel
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.Locale
@@ -39,19 +44,20 @@ class RemoteControlActivity : ComponentActivity() {
     private lateinit var viewModel: RemoteControlViewModel
     private lateinit var mediaProjectionManager: MediaProjectionManager
 
-    // 服务端：录屏权限回调
-    private val screenCaptureLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            val mediaProjection = mediaProjectionManager.getMediaProjection(result.resultCode, result.data!!)
-            mediaProjection?.let { viewModel.startAsServer(it) }
-        } else {
-            Toast.makeText(this, "必须同意录屏权限才能作为服务端！", Toast.LENGTH_SHORT).show()
+    // ==========================================
+    // 权限回调区域
+    // ==========================================
+
+    // 1. Android 13+ 通知权限回调 (前台服务必须要有通知)
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            Toast.makeText(this, "未授予通知权限，服务端可能在后台被杀", Toast.LENGTH_SHORT).show()
         }
     }
 
-    // 客户端：悬浮窗权限回调
+    // 2. 控制端：悬浮窗权限回调
     private val overlayPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { _ ->
@@ -62,10 +68,47 @@ class RemoteControlActivity : ComponentActivity() {
         }
     }
 
+    // 3. 🌟 核心修改：服务端录屏权限回调
+    private val screenCaptureLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
+            // 注意这里：授权成功后，我们不再直接生成 MediaProjection！
+            // 而是启动前台服务，让服务去生成，以满足 Android API 29+ 的安全限制。
+
+            val intent = Intent(this, ScreenCaptureService::class.java).apply {
+                putExtra("RESULT_CODE", result.resultCode)
+                putExtra("DATA", result.data)
+            }
+
+            // 监听服务就绪的回调，拿到 Projection 后再去启动 ViewModel 的推流网络逻辑
+            ScreenCaptureService.onServiceStarted = { projection ->
+                viewModel.startAsServer(projection)
+            }
+
+            // 启动前台服务
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+
+        } else {
+            Toast.makeText(this, "必须同意录屏权限才能作为服务端！", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         mediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+
+        // 请求 Android 13 通知权限
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
 
         setContent {
             StudyTheme {
@@ -76,11 +119,9 @@ class RemoteControlActivity : ComponentActivity() {
                 val localIp = remember { getLocalIpAddress(context) }
                 var ipInput by remember { mutableStateOf("") }
 
-                // 初始化悬浮窗管理器
                 val floatingHelper = remember {
                     FloatingWindowHelper(context) {
-                        // 当悬浮窗关闭时，断开客户端连接 (需在ViewModel中实现disconnect)
-                        // viewModel.disconnect()
+                        // 悬浮窗关闭时的回调
                     }
                 }
 
@@ -91,18 +132,18 @@ class RemoteControlActivity : ComponentActivity() {
                     }
                 }
 
-                // 页面销毁时清理悬浮窗
                 DisposableEffect(Unit) {
-                    onDispose { floatingHelper.dismiss() }
+                    onDispose {
+                        floatingHelper.dismiss()
+                        // Activity销毁时停止服务
+                        stopService(Intent(context, ScreenCaptureService::class.java))
+                    }
                 }
 
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Surface(modifier = Modifier.fillMaxSize().padding(innerPadding), color = Color(0xFFF3F4F6)) {
 
                         if (!uiState.isServer) {
-                            // ==========================================
-                            // 未连接 / 准备面板
-                            // ==========================================
                             Column(modifier = Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text("局域网悬浮窗远控", fontSize = 24.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 16.dp))
                                 Text("状态: ${uiState.message}", color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(bottom = 16.dp))
@@ -151,18 +192,15 @@ class RemoteControlActivity : ComponentActivity() {
                                                     Toast.makeText(context, "请输入 IP", Toast.LENGTH_SHORT).show()
                                                     return@Button
                                                 }
-                                                // 检查悬浮窗权限
                                                 if (!Settings.canDrawOverlays(context)) {
                                                     val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
                                                     overlayPermissionLauncher.launch(intent)
                                                     return@Button
                                                 }
 
-                                                // 弹出悬浮窗，并将悬浮窗里的 Surface 交给解码器渲染！
                                                 floatingHelper.show()
                                                 floatingHelper.surfaceView?.let { surface ->
                                                     viewModel.connectAsClient(ipInput, surface.holder.surface)
-                                                    // 提示用户可以切到后台了
                                                     Toast.makeText(context, "悬浮窗已开启，可返回桌面观看", Toast.LENGTH_LONG).show()
                                                 }
                                             },
@@ -173,9 +211,7 @@ class RemoteControlActivity : ComponentActivity() {
                                 }
                             }
                         } else {
-                            // ==========================================
                             // 服务端：投屏中控制面板
-                            // ==========================================
                             Column(modifier = Modifier.fillMaxSize().background(Color.Black), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                                 Text("正在作为被控端投屏中...", color = Color.White, fontSize = 18.sp)
                                 Spacer(modifier = Modifier.height(32.dp))

@@ -1,4 +1,4 @@
-package com.example.study.remoteControler.media
+package com.example.study.remoteController.media
 
 import android.media.MediaCodec
 import android.media.MediaFormat

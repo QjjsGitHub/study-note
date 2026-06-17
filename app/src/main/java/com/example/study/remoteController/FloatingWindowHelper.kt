@@ -1,4 +1,4 @@
-package com.example.study.remoteControler
+package com.example.study.remoteController
 
 import android.content.Context
 import android.graphics.PixelFormat
