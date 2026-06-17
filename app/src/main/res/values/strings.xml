@@ -174,4 +174,5 @@
     <string name="video_brightness">亮度</string>
     <string name="video_volume">音量</string>
     <string name="video_seconds">10</string>
+    <string name="title_activity_remote_control">RemoteControlActivity</string>
 </resources>

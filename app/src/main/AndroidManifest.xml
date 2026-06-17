@@ -183,12 +183,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
         <activity
             android:name=".videoPlayer.VideoPlayerActivity"
-            android:exported="true"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:exported="true"
             android:theme="@style/Theme.Study.NoActionBar" />
+        <activity
+            android:name=".remoteControler.RemoteControlActivity"
+            android:exported="false"
+            android:label="@string/title_activity_remote_control"
+            android:theme="@style/Theme.Study"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 
 </manifest>

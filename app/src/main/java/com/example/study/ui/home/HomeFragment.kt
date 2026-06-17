@@ -24,6 +24,7 @@ import com.example.study.fragment.BottomFragmentActivity
 import com.example.study.fragment.FragmentActivity
 import com.example.study.internet.InternetActivity
 import com.example.study.recyclerView.RecyclerViewActivity
+import com.example.study.remoteControler.RemoteControlActivity
 import com.example.study.ui.NormalActivity
 import com.example.study.videoPlayer.VideoPlayerActivity
 
@@ -190,6 +191,11 @@ class HomeFragment : Fragment() {
         }
 
         binding.button50.setOnClickListener { toFlow() }
+
+        binding.button51.setOnClickListener {
+            val intent: Intent = Intent(context, RemoteControlActivity::class.java)
+            startActivity(intent)
+        }
 
         binding.buttonVideoPlayer.setOnClickListener {
             startActivity(Intent(context, VideoPlayerActivity::class.java))
